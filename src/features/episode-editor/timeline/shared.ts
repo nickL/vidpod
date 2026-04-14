@@ -26,7 +26,7 @@ const MAX_MAJOR_TICK_COUNT = 11
 const TARGET_MAJOR_TICK_SPACING_PX = 72
 const MAX_MINOR_TICK_SPACING_PX = 26
 
-const getTimelineUsableWidthPx = (contentWidthPx: number) => {
+export const getTimelineUsableWidthPx = (contentWidthPx: number) => {
   return Math.max(contentWidthPx - CONTENT_HORIZONTAL_INSET_PX * 2, 0)
 }
 

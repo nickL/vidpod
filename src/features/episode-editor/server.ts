@@ -10,12 +10,14 @@ import {
   episodes,
   episodeVideoAssets,
   mediaAssets,
+  mediaWaveforms,
   shows,
 } from "@/db/schema"
 import { serverEnv } from "@/env/server"
 
 import { demoEpisodeMediaAssetId, isDemoEpisode } from "./demo"
 import { getMarkerPlaybackReadiness } from "./playback-runtime"
+import { ensureWaveformRequested } from "./waveform-jobs"
 
 import type { EditorData } from "./types"
 
@@ -144,10 +146,15 @@ export const getEpisodeEditor = async (
       mainMediaDurationMs: mediaAssets.durationMs,
       mainMediaPlaybackUrl: mediaAssets.playbackUrl,
       mainMediaThumbnailUrl: mediaAssets.thumbnailUrl,
+      mainMediaWaveformStatus: mediaWaveforms.status,
+      mainMediaWaveformPeaks: mediaWaveforms.peaks,
+      mainMediaWaveformBucketCount: mediaWaveforms.bucketCount,
+      mainMediaWaveformLastError: mediaWaveforms.lastError,
     })
     .from(episodes)
     .innerJoin(shows, eq(episodes.showId, shows.id))
     .leftJoin(mediaAssets, eq(episodes.mainMediaAssetId, mediaAssets.id))
+    .leftJoin(mediaWaveforms, eq(mediaAssets.id, mediaWaveforms.mediaAssetId))
     .where(
       and(
         eq(episodes.id, episodeId),
@@ -247,6 +254,22 @@ export const getEpisodeEditor = async (
 
   const episodeDurationMs =
     episode.episodeDurationMs ?? episode.mainMediaDurationMs ?? undefined
+  const mainMediaWaveform = episode.mainMediaAssetId
+    ? await ensureWaveformRequested({
+        mediaAssetId: episode.mainMediaAssetId,
+        sourceUrl:
+          episode.mainMediaPlaybackUrl ??
+          buildStreamPlaybackUrl(episode.mainMediaStreamVideoId!),
+        waveform: episode.mainMediaWaveformStatus
+          ? {
+              status: episode.mainMediaWaveformStatus,
+              peaks: episode.mainMediaWaveformPeaks ?? undefined,
+              bucketCount: episode.mainMediaWaveformBucketCount ?? undefined,
+              lastError: episode.mainMediaWaveformLastError ?? undefined,
+            }
+          : undefined,
+      })
+    : undefined
 
   return {
     show: {
@@ -305,6 +328,7 @@ export const getEpisodeEditor = async (
             thumbnailUrl: episode.mainMediaThumbnailUrl,
             durationMs: episode.mainMediaDurationMs,
           }),
+          waveform: mainMediaWaveform,
         }
       : undefined,
     adLibrary: adLibraryRows.map((ad) => ({

@@ -9,6 +9,13 @@ export const mediaAssetStatusEnum = pgEnum("media_asset_status", [
   "failed",
 ])
 
+export const mediaWaveformStatusEnum = pgEnum("media_waveform_status", [
+  "pending",
+  "processing",
+  "ready",
+  "failed",
+])
+
 export const adAssetStatusEnum = pgEnum("ad_asset_status", ["active", "archived"])
 
 export const adBreakSelectionModeEnum = pgEnum("ad_break_selection_mode", [

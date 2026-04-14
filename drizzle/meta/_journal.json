@@ -36,6 +36,13 @@
       "when": 1776048464729,
       "tag": "0004_absurd_chat",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1776066206224,
+      "tag": "0005_luxuriant_tomorrow_man",
+      "breakpoints": true
     }
   ]
 }

@@ -1,4 +1,12 @@
 export type MediaStatus = "uploading" | "processing" | "ready" | "failed"
+export type MediaWaveformStatus = "pending" | "processing" | "ready" | "failed"
+
+export type MediaWaveform = {
+  status: MediaWaveformStatus
+  peaks?: number[]
+  bucketCount?: number
+  lastError?: string
+}
 
 export type Show = {
   id: string
@@ -20,6 +28,7 @@ export type MediaAsset = {
   durationMs?: number
   playbackUrl?: string
   thumbnailUrl?: string
+  waveform?: MediaWaveform
 }
 
 export type AdLibraryItem = {

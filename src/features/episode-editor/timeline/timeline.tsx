@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 
 import { Spacer } from "@/components/ui/spacer"
 
-import type { Marker } from "../types"
+import type { Marker, MarkerActivation, MediaWaveform } from "../types"
 
 import { Playhead } from "./playhead"
 import {
@@ -20,7 +20,6 @@ import { Track } from "./track"
 import { Ruler } from "./ruler"
 import { TimelineScrollbar } from "./timeline-scrollbar"
 import type { RulerScale } from "./shared"
-import type { MarkerActivation } from "../types"
 
 const HANDLE_ZONE_HEIGHT = 32
 const TRACK_HEIGHT = 128
@@ -59,6 +58,7 @@ type TimelineProps = {
   markers: Marker[]
   displayTimeMs: number
   durationMs: number
+  waveform?: MediaWaveform
   markerActivation?: MarkerActivation
   selectedMarkerId?: string
   onMarkerTimeCommit: (markerId: string, requestedTimeMs: number) => void
@@ -73,6 +73,7 @@ export const Timeline = ({
   markers,
   displayTimeMs,
   durationMs,
+  waveform,
   markerActivation,
   selectedMarkerId,
   onMarkerTimeCommit,
@@ -646,6 +647,7 @@ export const Timeline = ({
           contentWidthPx={contentWidthPx}
           timelineDurationMs={timelineDurationMs}
           markers={timelineMarkers}
+          waveform={waveform}
           selectedMarkerId={selectedMarkerId}
           draggingMarkerId={markerDragState?.markerId}
           rulerScale={rulerScale}
@@ -783,6 +785,7 @@ type TimelineViewportProps = {
   contentWidthPx: number
   timelineDurationMs: number
   markers: Marker[]
+  waveform?: MediaWaveform
   selectedMarkerId?: string
   draggingMarkerId?: string
   rulerScale: RulerScale
@@ -802,6 +805,7 @@ const TimelineViewport = ({
   contentWidthPx,
   timelineDurationMs,
   markers,
+  waveform,
   selectedMarkerId,
   draggingMarkerId,
   rulerScale,
@@ -830,8 +834,10 @@ const TimelineViewport = ({
       >
         <Spacer className="h-8" />
         <Track
+          contentWidthPx={contentWidthPx}
           markers={markers}
           timelineDurationMs={timelineDurationMs}
+          waveform={waveform}
           selectedMarkerId={selectedMarkerId}
           draggingMarkerId={draggingMarkerId}
           onMarkerDragStart={onMarkerDragStart}

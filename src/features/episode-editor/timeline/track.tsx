@@ -1,13 +1,20 @@
 import { useMemo } from "react"
 
-import type { Marker } from "../types"
+import type { Marker, MediaWaveform, MediaWaveformStatus } from "../types"
 
+import {
+  buildTimelineWaveformBars,
+  ContentWaveform,
+  type WaveformBar,
+} from "./content-waveform"
 import { MarkerSegment } from "./marker-segment"
 import { buildSegments, type Segment } from "./segments"
 
 type TrackProps = {
+  contentWidthPx: number
   markers: Marker[]
   timelineDurationMs: number
+  waveform?: MediaWaveform
   selectedMarkerId?: string
   draggingMarkerId?: string
   onMarkerDragStart?: (
@@ -17,7 +24,11 @@ type TrackProps = {
 }
 
 type TrackSegmentProps = {
+  contentWidthPx: number
   segment: Segment
+  timelineDurationMs: number
+  waveformBars?: WaveformBar[]
+  waveformStatus: MediaWaveformStatus
   selectedMarkerId?: string
   draggingMarkerId?: string
   onMarkerDragStart?: (
@@ -27,8 +38,10 @@ type TrackSegmentProps = {
 }
 
 export const Track = ({
+  contentWidthPx,
   markers,
   timelineDurationMs,
+  waveform,
   selectedMarkerId,
   draggingMarkerId,
   onMarkerDragStart,
@@ -37,6 +50,16 @@ export const Track = ({
     () => buildSegments(markers, timelineDurationMs),
     [markers, timelineDurationMs]
   )
+  const waveformBars = useMemo(
+    () =>
+      buildTimelineWaveformBars({
+        contentWidthPx,
+        timelineDurationMs,
+        waveform,
+      }),
+    [contentWidthPx, timelineDurationMs, waveform]
+  )
+  const waveformStatus: MediaWaveformStatus = waveform?.status ?? "pending"
 
   return (
     <div className="relative h-32 rounded-l-lg bg-zinc-950 py-2">
@@ -48,7 +71,11 @@ export const Track = ({
                 ? `marker-${segment.marker.id}`
                 : `content-${segment.startMs}-${segment.endMs}`
             }
+            contentWidthPx={contentWidthPx}
             segment={segment}
+            timelineDurationMs={timelineDurationMs}
+            waveformBars={waveformBars}
+            waveformStatus={waveformStatus}
             selectedMarkerId={selectedMarkerId}
             draggingMarkerId={draggingMarkerId}
             onMarkerDragStart={onMarkerDragStart}
@@ -60,7 +87,11 @@ export const Track = ({
 }
 
 const TrackSegment = ({
+  contentWidthPx,
   segment,
+  timelineDurationMs,
+  waveformBars,
+  waveformStatus,
   selectedMarkerId,
   draggingMarkerId,
   onMarkerDragStart,
@@ -68,7 +99,17 @@ const TrackSegment = ({
   const durationMs = segment.endMs - segment.startMs
 
   if (segment.type === "content") {
-    return <ContentSegment durationMs={durationMs} />
+    return (
+      <ContentSegment
+        contentWidthPx={contentWidthPx}
+        durationMs={durationMs}
+        segmentEndMs={segment.endMs}
+        segmentStartMs={segment.startMs}
+        timelineDurationMs={timelineDurationMs}
+        waveformBars={waveformBars}
+        waveformStatus={waveformStatus}
+      />
+    )
   }
 
   return (
@@ -82,13 +123,38 @@ const TrackSegment = ({
   )
 }
 
-const ContentSegment = ({ durationMs }: { durationMs: number }) => (
+const ContentSegment = ({
+  contentWidthPx,
+  durationMs,
+  segmentEndMs,
+  segmentStartMs,
+  timelineDurationMs,
+  waveformBars,
+  waveformStatus,
+}: {
+  contentWidthPx: number
+  durationMs: number
+  segmentEndMs: number
+  segmentStartMs: number
+  timelineDurationMs: number
+  waveformBars?: WaveformBar[]
+  waveformStatus: MediaWaveformStatus
+}) => (
   <div
-    className="min-w-0 rounded-md"
+    className="relative min-w-0 overflow-hidden rounded-md"
     style={{
       flexGrow: durationMs,
       flexBasis: 0,
       background: "linear-gradient(to bottom, #F0ABFC, #F3BCFD)",
     }}
-  />
+  >
+    <ContentWaveform
+      contentWidthPx={contentWidthPx}
+      segmentEndMs={segmentEndMs}
+      segmentStartMs={segmentStartMs}
+      timelineDurationMs={timelineDurationMs}
+      waveformBars={waveformBars}
+      waveformStatus={waveformStatus}
+    />
+  </div>
 )
