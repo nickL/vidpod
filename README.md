@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Vidpod Editor
 
-## Getting Started
+Dynamic ads editor for creators. Place markers for ad interstitials, live preview, and export.
 
-First, run the development server:
+## Stack
+
+TypeScript + Next.js + Tailwind. Drizzle + Neon Postgres. Cloudflare Workers + Stream + R2 for pipelines, HLS.js for playback.
+
+## Getting started
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+pnpm install
+cp .env.example .env   # fill in the values
+pnpm db:migrate
+pnpm db:seed           # loads the demo episode, ad library, and media used by the PoC
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Uploads, waveform jobs, HLS preview, and MP4 export also require the Cloudflare / worker / transcoder envs in `.env`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Ad Library
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Browse, upload, and pick ads for a marker.
 
-## Learn More
+- Ads upload to Cloudflare Stream. Progress streams back into the dialog.
+- Dialog state (`useMarkerDialog`) separates from mutations (`useMarkerWorkflow`).
+- Code: `src/editor/ads/` and `src/editor/markers/`.
 
-To learn more about Next.js, take a look at the following resources:
+## Video Player
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Plays the episode with ads stitched in as interstitials.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Playback hook (`usePlayback`) resolves a session on first play (episode + ordered ad breaks), then swaps video sources in place to run each ad inline.
+- Playhead time flows out so the timeline stays synced.
+- Keyboard (space, skips, jumps) handled at the panel level.
+- Code: `src/editor/playback/`.
 
-## Deploy on Vercel
+## Timeline
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Place and arrange markers on the episode.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Markers, playhead, and timeline ruler get positions from `shared.ts`.
+- Rapid drag saves are queued through `useMarkerDragSaves` so only one fires at a time.
+- Code: `src/editor/timeline/` and `src/editor/markers/use-marker-drag-saves.ts`.
+
+## Extras
+
+Done:
+- Video and ad uploads
+- Real waveforms
+- MP4 render
+- HLS output (single quality for now, multi coming)
+- Hosted: Next.js on Vercel, Cloudflare Workers + Queues + R2 for pipelines
+
+Up next:
+- Transcript pipeline
+- Durable pipelines
+
+## Verify
+
+```bash
+pnpm lint
+pnpm build
+pnpm test
+```
