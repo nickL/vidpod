@@ -33,6 +33,12 @@ export const serverEnv = {
   get hlsWorkerPublicBaseUrl() {
     return readOptionalEnv("HLS_WORKER_PUBLIC_BASE_URL")
   },
+  get transcoderUrl() {
+    return readOptionalEnv("TRANSCODER_URL")
+  },
+  get transcoderAuthToken() {
+    return readOptionalEnv("TRANSCODER_AUTH_TOKEN")
+  },
   get mediaJobsToken() {
     return readOptionalEnv("MEDIA_JOBS_TOKEN")
   },

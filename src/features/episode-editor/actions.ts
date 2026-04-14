@@ -9,6 +9,7 @@ import {
   recordPlaybackEvent,
   startPlaybackSession,
 } from "./playback-sessions"
+import { generateMp4Export } from "./mp4-export"
 import {
   failUpload,
   resetDemoEpisode,
@@ -52,6 +53,12 @@ export const recordPlaybackEventAction = async (
   input: PlaybackEventInput
 ) => {
   return recordPlaybackEvent(input)
+}
+
+export const generateMp4ExportAction = async (
+  playbackSessionId: string
+) => {
+  return generateMp4Export(playbackSessionId)
 }
 
 export const startUploadAction = async (input: UploadInitInput) => {

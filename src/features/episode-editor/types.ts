@@ -136,6 +136,22 @@ export type HlsPlan = {
   }>
 }
 
+export type Mp4Plan = {
+  playbackSessionId: string
+  episode: {
+    id: string
+    title: string
+    durationMs?: number
+    playbackUrl: string
+  }
+  resolvedBreaks: HlsPlan["resolvedBreaks"]
+}
+
+export type Mp4Export = {
+  downloadUrl: string
+  fileName: string
+}
+
 export type PlaybackEventInput = {
   playbackSessionId: string
   adBreakId: string

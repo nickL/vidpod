@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
-import { recordPlaybackEventAction, startPlaybackSessionAction } from "./actions"
-import { HlsPreviewDialog } from "./hls-preview-dialog"
+import {
+  generateMp4ExportAction,
+  recordPlaybackEventAction,
+  startPlaybackSessionAction,
+} from "./actions"
+import { HLSDebugModal } from "./hls-debug-modal"
 import { PlayerPanel } from "./player-panel"
 import { Timeline } from "./timeline"
 import { usePlayback } from "./use-playback"
@@ -70,8 +74,12 @@ export const PlaybackSection = ({
   const previewConfigKeyRef = useRef(previewConfigKey)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [isPreparingPreview, setIsPreparingPreview] = useState(false)
+  const [isGeneratingMp4, setIsGeneratingMp4] = useState(false)
+  const [previewSessionId, setPreviewSessionId] = useState<string>()
   const [previewManifestUrl, setPreviewManifestUrl] = useState<string>()
   const [previewError, setPreviewError] = useState<string>()
+  const [downloadUrl, setDownloadUrl] = useState<string>()
+  const [downloadError, setDownloadError] = useState<string>()
   const startPlaybackSession = useCallback(
     async (playheadTimeMs: number) => {
       const requestConfigKey = previewConfigKeyRef.current
@@ -159,6 +167,8 @@ export const PlaybackSection = ({
     setIsPreviewOpen(true)
     setIsPreparingPreview(true)
     setPreviewError(undefined)
+    setDownloadUrl(undefined)
+    setDownloadError(undefined)
 
     try {
       const playbackSessionStart = await startPlaybackSessionAction({
@@ -166,16 +176,40 @@ export const PlaybackSection = ({
         playheadTimeMs: 0,
       })
 
+      setPreviewSessionId(playbackSessionStart.session.id)
       setPreviewManifestUrl(
         `${normalizedHlsBaseUrl}/sessions/${playbackSessionStart.session.id}/master.m3u8`
       )
     } catch {
+      setPreviewSessionId(undefined)
       setPreviewManifestUrl(undefined)
       setPreviewError("Unable to prepare HLS preview.")
     } finally {
       setIsPreparingPreview(false)
     }
   }, [episodeId, normalizedHlsBaseUrl])
+
+  const generateMp4 = useCallback(async () => {
+    if (!previewSessionId) {
+      return
+    }
+
+    setIsGeneratingMp4(true)
+    setDownloadError(undefined)
+
+    try {
+      const exportResult = await generateMp4ExportAction(previewSessionId)
+
+      setDownloadUrl(exportResult.downloadUrl)
+    } catch (error) {
+      setDownloadUrl(undefined)
+      setDownloadError(
+        error instanceof Error ? error.message : "Unable to generate MP4."
+      )
+    } finally {
+      setIsGeneratingMp4(false)
+    }
+  }, [previewSessionId])
 
   const handlePreviewOpenChange = useCallback((open: boolean) => {
     setIsPreviewOpen(open)
@@ -185,8 +219,12 @@ export const PlaybackSection = ({
     }
 
     setIsPreparingPreview(false)
+    setIsGeneratingMp4(false)
+    setPreviewSessionId(undefined)
     setPreviewManifestUrl(undefined)
     setPreviewError(undefined)
+    setDownloadUrl(undefined)
+    setDownloadError(undefined)
   }, [])
 
   return (
@@ -216,11 +254,15 @@ export const PlaybackSection = ({
         onAddEpisodeVideo={onAddEpisodeVideo}
         onUseEpisodeVideo={onUseEpisodeVideo}
       />
-      <HlsPreviewDialog
+      <HLSDebugModal
         open={isPreviewOpen}
         manifestUrl={previewManifestUrl}
         isLoading={isPreparingPreview}
+        isGeneratingMp4={isGeneratingMp4}
+        downloadUrl={downloadUrl}
+        downloadError={downloadError}
         error={previewError}
+        onGenerateMp4={generateMp4}
         onOpenChange={handlePreviewOpenChange}
       />
       <Timeline
