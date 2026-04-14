@@ -16,3 +16,18 @@ queue = "vidpod-media-jobs"
 max_batch_size = 1
 max_batch_timeout = 2
 max_retries = 3
+
+[env.dev]
+name = "vidpod-media-jobs-dev"
+workers_dev = true
+routes = []
+
+[[env.dev.queues.producers]]
+queue = "vidpod-media-jobs-dev"
+binding = "MEDIA_JOBS"
+
+[[env.dev.queues.consumers]]
+queue = "vidpod-media-jobs-dev"
+max_batch_size = 1
+max_batch_timeout = 2
+max_retries = 3

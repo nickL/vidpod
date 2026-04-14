@@ -9,3 +9,8 @@ routes = [
 
 [observability.logs]
 enabled = true
+
+[env.dev]
+name = "hls-worker-dev"
+workers_dev = true
+routes = []

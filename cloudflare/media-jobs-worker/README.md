@@ -25,4 +25,4 @@
 
 ## App Update
 
-Once completed/failed, the worker posts updates `/api/internal/media-waveforms` and passes the  `MEDIA_JOBS_TOKEN`  token.
+Once completed/failed, the worker posts updates to `/api/worker/media-waveforms` and passes the `MEDIA_JOBS_TOKEN` token.

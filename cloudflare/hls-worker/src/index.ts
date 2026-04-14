@@ -48,7 +48,7 @@ const m3u8 = (body: string) =>
 const loadHlsPlan = async (env: Env, sessionId: string): Promise<Plan> => {
   const appBaseUrl = env.APP_INTERNAL_BASE_URL.replace(/\/$/, "")
   const response = await fetch(
-    `${appBaseUrl}/api/internal/hls/sessions/${sessionId}/manifest-plan`,
+    `${appBaseUrl}/api/worker/hls/sessions/${sessionId}/manifest-plan`,
     {
       headers: {
         authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,

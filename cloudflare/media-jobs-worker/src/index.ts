@@ -76,7 +76,7 @@ const isGenerateWaveformJob = (value: unknown): value is GenerateWaveformJob => 
 
 const postWaveformUpdate = async (env: Env, body: unknown) => {
   const response = await fetch(
-    `${trimTrailingSlash(env.APP_INTERNAL_BASE_URL)}/api/internal/media-waveforms`,
+    `${trimTrailingSlash(env.APP_INTERNAL_BASE_URL)}/api/worker/media-waveforms`,
     {
       method: "POST",
       headers: {
