@@ -1,6 +1,6 @@
 import "server-only"
 
-import { and, asc, eq, inArray, isNull } from "drizzle-orm"
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm"
 
 import { db } from "@/db"
 import {
@@ -8,11 +8,13 @@ import {
   adBreakVariants,
   adBreaks,
   episodes,
+  episodeVideoAssets,
   mediaAssets,
   shows,
 } from "@/db/schema"
 import { serverEnv } from "@/env/server"
 
+import { demoEpisodeMediaAssetId, isDemoEpisode } from "./demo"
 import { getMarkerPlaybackReadiness } from "./playback-runtime"
 
 import type { EditorData } from "./types"
@@ -35,11 +37,59 @@ const buildStreamPlaybackUrl = (streamVideoId: string) => {
   return `https://${hostname}/${streamVideoId}/manifest/video.m3u8`
 }
 
+const getDefaultThumbnailTimeSec = (durationMs?: number | null) => {
+  if (!durationMs || durationMs <= 1_000) {
+    return 1
+  }
+
+  return Math.min(5, Math.max(1, Math.round(durationMs / 2_000)))
+}
+
+const buildStreamThumbnailUrl = (
+  streamVideoId: string,
+  durationMs?: number | null
+) => {
+  const streamCustomerSubdomain = serverEnv.cloudflareStreamCustomerSubdomain
+
+  if (!streamCustomerSubdomain) {
+    return undefined
+  }
+
+  const hostname = streamCustomerSubdomain
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "")
+
+  return `https://${hostname}/${streamVideoId}/thumbnails/thumbnail.jpg?time=${getDefaultThumbnailTimeSec(durationMs)}s&height=270`
+}
+
+const getThumbnailUrl = ({
+  streamVideoId,
+  thumbnailUrl,
+  durationMs,
+}: {
+  streamVideoId: string
+  thumbnailUrl?: string | null
+  durationMs?: number | null
+}) => {
+  if (!thumbnailUrl) {
+    return buildStreamThumbnailUrl(streamVideoId, durationMs)
+  }
+
+  if (thumbnailUrl.includes("time=")) {
+    return thumbnailUrl
+  }
+
+  return buildStreamThumbnailUrl(streamVideoId, durationMs) ?? thumbnailUrl
+}
+
 const toEditorMarkerVariants = (
   variants: Array<{
     id: string
     adAssetId: string
     adAssetTitle: string
+    mediaStreamVideoId: string
+    mediaThumbnailUrl: string | null
+    mediaDurationMs: number | null
     ordinal: number
     status: "active" | "paused"
     weight: number | null
@@ -50,6 +100,11 @@ const toEditorMarkerVariants = (
     id: variant.id,
     adAssetId: variant.adAssetId,
     adAssetTitle: variant.adAssetTitle,
+    thumbnailUrl: getThumbnailUrl({
+      streamVideoId: variant.mediaStreamVideoId,
+      thumbnailUrl: variant.mediaThumbnailUrl,
+      durationMs: variant.mediaDurationMs,
+    }),
     ordinal: variant.ordinal,
     status: variant.status,
     weight: variant.weight ?? undefined,
@@ -128,6 +183,9 @@ export const getEpisodeEditor = async (
             adBreakId: adBreakVariants.adBreakId,
             adAssetId: adBreakVariants.adAssetId,
             adAssetTitle: adAssets.title,
+            mediaStreamVideoId: mediaAssets.streamVideoId,
+            mediaThumbnailUrl: mediaAssets.thumbnailUrl,
+            mediaDurationMs: mediaAssets.durationMs,
             mediaStatus: mediaAssets.status,
             ordinal: adBreakVariants.ordinal,
             weight: adBreakVariants.weight,
@@ -153,6 +211,7 @@ export const getEpisodeEditor = async (
       id: adAssets.id,
       title: adAssets.title,
       status: adAssets.status,
+      createdAt: adAssets.createdAt,
       mediaAssetId: mediaAssets.id,
       mediaStreamVideoId: mediaAssets.streamVideoId,
       mediaStatus: mediaAssets.status,
@@ -163,6 +222,28 @@ export const getEpisodeEditor = async (
     .innerJoin(mediaAssets, eq(adAssets.mediaAssetId, mediaAssets.id))
     .where(eq(adAssets.showId, episode.showId))
     .orderBy(asc(adAssets.createdAt))
+
+  const episodeVideoRows = await db
+    .select({
+      id: episodeVideoAssets.id,
+      title: episodeVideoAssets.title,
+      createdAt: episodeVideoAssets.createdAt,
+      mediaAssetId: mediaAssets.id,
+      mediaStreamVideoId: mediaAssets.streamVideoId,
+      mediaStatus: mediaAssets.status,
+      mediaDurationMs: mediaAssets.durationMs,
+      mediaPlaybackUrl: mediaAssets.playbackUrl,
+      mediaThumbnailUrl: mediaAssets.thumbnailUrl,
+    })
+    .from(episodeVideoAssets)
+    .innerJoin(mediaAssets, eq(episodeVideoAssets.mediaAssetId, mediaAssets.id))
+    .where(eq(episodeVideoAssets.episodeId, episodeId))
+    .orderBy(desc(episodeVideoAssets.createdAt))
+
+  const canResetDemo =
+    isDemoEpisode(episodeId) &&
+    (episode.mainMediaAssetId !== demoEpisodeMediaAssetId ||
+      episodeVideoRows.length > 0)
 
   const episodeDurationMs =
     episode.episodeDurationMs ?? episode.mainMediaDurationMs ?? undefined
@@ -191,6 +272,7 @@ export const getEpisodeEditor = async (
           status: row.status,
           variants: markerVariants.map((variant) => ({
             id: variant.id,
+            adAssetId: variant.adAssetId,
             status: variant.status,
             weight: variant.weight ?? undefined,
             isControl: variant.isControl ?? undefined,
@@ -218,20 +300,49 @@ export const getEpisodeEditor = async (
           playbackUrl:
             episode.mainMediaPlaybackUrl ??
             buildStreamPlaybackUrl(episode.mainMediaStreamVideoId!),
-          thumbnailUrl: episode.mainMediaThumbnailUrl ?? undefined,
+          thumbnailUrl: getThumbnailUrl({
+            streamVideoId: episode.mainMediaStreamVideoId!,
+            thumbnailUrl: episode.mainMediaThumbnailUrl,
+            durationMs: episode.mainMediaDurationMs,
+          }),
         }
       : undefined,
     adLibrary: adLibraryRows.map((ad) => ({
       id: ad.id,
       title: ad.title,
       status: ad.status,
+      createdAt: ad.createdAt.toISOString(),
       mediaAsset: {
         id: ad.mediaAssetId,
         streamVideoId: ad.mediaStreamVideoId,
         status: ad.mediaStatus,
         durationMs: ad.mediaDurationMs ?? undefined,
-        thumbnailUrl: ad.mediaThumbnailUrl ?? undefined,
+        thumbnailUrl: getThumbnailUrl({
+          streamVideoId: ad.mediaStreamVideoId,
+          thumbnailUrl: ad.mediaThumbnailUrl,
+          durationMs: ad.mediaDurationMs,
+        }),
       },
     })),
+    episodeVideoAssets: episodeVideoRows.map((video) => ({
+      id: video.id,
+      title: video.title,
+      createdAt: video.createdAt.toISOString(),
+      mediaAsset: {
+        id: video.mediaAssetId,
+        streamVideoId: video.mediaStreamVideoId,
+        status: video.mediaStatus,
+        durationMs: video.mediaDurationMs ?? undefined,
+        playbackUrl:
+          video.mediaPlaybackUrl ??
+          buildStreamPlaybackUrl(video.mediaStreamVideoId),
+        thumbnailUrl: getThumbnailUrl({
+          streamVideoId: video.mediaStreamVideoId,
+          thumbnailUrl: video.mediaThumbnailUrl,
+          durationMs: video.mediaDurationMs,
+        }),
+      },
+    })),
+    canResetDemo,
   }
 }

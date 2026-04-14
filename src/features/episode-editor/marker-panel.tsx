@@ -23,16 +23,24 @@ const modeBadgeLabels = {
 type MarkerPanelProps = {
   markers: Marker[]
   selectedMarkerId?: string
+  markerChangeLocked?: boolean
+  createMarkerDisabledReason?: string
   onEdit?: (markerId: string) => void
+  onDelete?: (markerId: string) => void
   onCreateMarker?: () => void
+  onAutomaticallyPlace?: () => void
   onActivateMarker?: (markerId: string, requestedTimeMs: number) => void
 }
 
 export const MarkerPanel = ({
   markers,
   selectedMarkerId,
+  markerChangeLocked = false,
+  createMarkerDisabledReason,
   onEdit,
+  onDelete,
   onCreateMarker,
+  onAutomaticallyPlace,
   onActivateMarker,
 }: MarkerPanelProps) => {
   return (
@@ -69,6 +77,7 @@ export const MarkerPanel = ({
                 <Button
                   variant="outline"
                   className="shrink-0"
+                  disabled={markerChangeLocked}
                   onClick={(event) => {
                     event.stopPropagation()
                     onEdit?.(marker.id)
@@ -79,8 +88,10 @@ export const MarkerPanel = ({
                 <Button
                   size="icon-lg"
                   className="hidden shrink-0 bg-red-300 text-red-900 hover:bg-red-400 sm:inline-flex"
+                  disabled={markerChangeLocked}
                   onClick={(event) => {
                     event.stopPropagation()
+                    onDelete?.(marker.id)
                   }}
                 >
                   <Trash2 />
@@ -91,12 +102,28 @@ export const MarkerPanel = ({
         </div>
 
         <div className="mt-auto flex flex-col gap-4 pt-8">
-          <Button size="lg" className="w-full" onClick={onCreateMarker}>
+          <Button
+            size="lg"
+            className="w-full"
+            onClick={onCreateMarker}
+            disabled={markerChangeLocked || Boolean(createMarkerDisabledReason)}
+          >
             Create ad marker
             <Plus />
           </Button>
+          {createMarkerDisabledReason ? (
+            <p className="text-center text-xs text-zinc-500">
+              {createMarkerDisabledReason}
+            </p>
+          ) : null}
 
-          <Button variant="outline" size="lg" className="w-full" onClick={() => {}}>
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full"
+            onClick={onAutomaticallyPlace}
+            disabled={markerChangeLocked}
+          >
             Automatically place
             <Sparkles />
           </Button>

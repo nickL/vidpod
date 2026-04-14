@@ -1,3 +1,4 @@
+import Image from "next/image"
 import { cva } from "class-variance-authority"
 
 import { Spacer } from "@/components/ui/spacer"
@@ -78,6 +79,7 @@ export const MarkerSegment = ({
 }: MarkerSegmentProps) => {
   const selectionMode = marker.selectionMode
   const isStatic = selectionMode === "static"
+  const staticThumbnailUrl = marker.variants[0]?.thumbnailUrl
 
   return (
     <div
@@ -98,7 +100,10 @@ export const MarkerSegment = ({
 
       {isStatic ? (
         <>
-          <MarkerThumbnail />
+          <MarkerThumbnail
+            thumbnailUrl={staticThumbnailUrl}
+            title={marker.variants[0]?.adAssetTitle}
+          />
           <GripHandle mode={selectionMode} centered />
         </>
       ) : (
@@ -141,11 +146,32 @@ const Badge = ({
   )
 }
 
-const MarkerThumbnail = () => {
+const MarkerThumbnail = ({
+  thumbnailUrl,
+  title,
+}: {
+  thumbnailUrl?: string
+  title?: string
+}) => {
+  if (!thumbnailUrl) {
+    return <div className="h-10 w-full max-w-24 shrink-0" aria-hidden="true" />
+  }
+
   return (
-    <div className="w-full shrink-0 border-y-2 border-zinc-950">
-      <div className="flex h-10 items-center justify-center overflow-hidden bg-zinc-100">
-        <span className="text-[8px] text-zinc-400">Preview</span>
+    <div className="flex w-full shrink-0 justify-center">
+      <div className="w-full max-w-24 border-y-2 border-zinc-950">
+        <div className="flex h-10 items-center justify-center overflow-hidden bg-zinc-100">
+          <div className="relative h-full w-full">
+            <Image
+              src={thumbnailUrl}
+              alt={title ?? "Ad preview"}
+              fill
+              unoptimized
+              sizes="128px"
+              className="object-cover"
+            />
+          </div>
+        </div>
       </div>
     </div>
   )

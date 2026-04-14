@@ -26,3 +26,23 @@ export const episodes = pgTable(
     index("episodes_main_media_asset_id_idx").on(table.mainMediaAssetId),
   ]
 )
+
+export const episodeVideoAssets = pgTable(
+  "episode_video_assets",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    episodeId: uuid("episode_id")
+      .notNull()
+      .references(() => episodes.id, { onDelete: "cascade" }),
+    mediaAssetId: uuid("media_asset_id")
+      .notNull()
+      .references(() => mediaAssets.id, { onDelete: "restrict" }),
+    title: varchar("title", { length: 255 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("episode_video_assets_episode_id_idx").on(table.episodeId),
+    index("episode_video_assets_media_asset_id_idx").on(table.mediaAssetId),
+  ]
+)

@@ -35,6 +35,13 @@ export type AdLibraryItem = {
   }
 }
 
+export type EpisodeVideoAsset = {
+  id: string
+  title: string
+  createdAt: string
+  mediaAsset: MediaAsset
+}
+
 export type MarkerVariant = {
   id: string
   adAssetId: string
@@ -111,5 +118,33 @@ export type EditorData = {
   episode: Episode
   markers: Marker[]
   adLibrary: AdLibraryItem[]
+  episodeVideoAssets: EpisodeVideoAsset[]
+  canResetDemo: boolean
   mainMediaAsset?: MediaAsset
+}
+
+export type UploadTarget = "episode" | "ad"
+
+export type UploadInitInput = {
+  target: UploadTarget
+  episodeId: string
+  filename: string
+  fileSize: number
+}
+
+export type UploadInitResult =
+  | {
+      target: "episode"
+      uploadUrl: string
+      episodeVideoAsset: EpisodeVideoAsset
+    }
+  | {
+      target: "ad"
+      uploadUrl: string
+      adLibraryItem: AdLibraryItem
+    }
+
+export type UploadProgressState = {
+  phase: "uploading" | "processing"
+  progressPercent: number
 }

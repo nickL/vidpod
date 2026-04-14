@@ -1,7 +1,17 @@
 "use client"
 
+import { useMemo, useRef, useState, type ChangeEvent } from "react"
 import Image from "next/image"
-import { ArrowRight, ChevronDown, ChevronUp, ChevronsUpDown, FolderOpen, Library, Search } from "lucide-react"
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  ChevronsUpDown,
+  FolderOpen,
+  Library,
+  Plus,
+  Search,
+} from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -14,42 +24,153 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
+import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { formatDuration } from "@/lib/utils"
+import { formatDate, formatDuration } from "@/lib/utils"
 
-import type { AdLibraryItem } from "./types"
+import type { AdLibraryItem, Marker, UploadProgressState } from "./types"
 
-const adTagMap: Record<string, string[]> = {
-  "Eight Sleep Q4 Pod 3 - v1": ["Eight Sleep", "Pod 3"],
-  "Eight Sleep Q4 Pod 3 - v2": ["Eight Sleep", "Pod 3"],
-  "Brilliant (maths & physics)": ["Brilliant", "Back to school '24"],
+const getAdTags = (adTitle: string) => {
+  if (adTitle.includes("(90s)")) {
+    return ["Example ads", "90s"]
+  }
+
+  if (adTitle.includes("(Classic)")) {
+    return ["Example ads", "Classic"]
+  }
+
+  return []
 }
 
 type AdLibraryDialogProps = {
   open: boolean
   onOpenChange: (open: boolean) => void
+  mode: "create" | "edit"
   adLibrary: AdLibraryItem[]
+  draft: MarkerDialogDraft
+  isSaving?: boolean
+  uploadError?: string
+  uploadProgressByMediaAssetId: Record<string, UploadProgressState>
+  onDraftChange: (draft: MarkerDialogDraft) => void
+  onConfirm: () => void
+  onUploadAds: (files: File[]) => void | Promise<void>
+}
+
+type MarkerDialogDraft = {
+  requestedTimeMs: number
+  selectionMode: Marker["selectionMode"]
+  selectedAdAssetIds: string[]
 }
 
 export const AdLibraryDialog = ({
   open,
   onOpenChange,
+  mode,
   adLibrary,
+  draft,
+  isSaving = false,
+  uploadError,
+  uploadProgressByMediaAssetId,
+  onDraftChange,
+  onConfirm,
+  onUploadAds,
 }: AdLibraryDialogProps) => {
+  const [searchQuery, setSearchQuery] = useState("")
+  const [sortNewestFirst, setSortNewestFirst] = useState(true)
+  const uploadInputRef = useRef<HTMLInputElement | null>(null)
+
+  const visibleAds = useMemo(() => {
+    const normalizedSearchQuery = searchQuery.trim().toLowerCase()
+    const matchingAds = normalizedSearchQuery
+      ? adLibrary.filter((ad) =>
+          ad.title.toLowerCase().includes(normalizedSearchQuery)
+        )
+      : adLibrary
+
+    return [...matchingAds].sort((leftAd, rightAd) => {
+      const leftCreatedAt = new Date(leftAd.createdAt).getTime()
+      const rightCreatedAt = new Date(rightAd.createdAt).getTime()
+
+      return sortNewestFirst
+        ? rightCreatedAt - leftCreatedAt
+        : leftCreatedAt - rightCreatedAt
+    })
+  }, [adLibrary, searchQuery, sortNewestFirst])
+
+  const confirmLabel =
+    mode === "edit"
+      ? "Save changes"
+      : draft.selectionMode === "ab"
+        ? "Create A/B test"
+        : "Create marker"
+  const title =
+    mode === "edit"
+      ? draft.selectionMode === "ab"
+        ? "A/B test"
+        : "Edit ad marker"
+      : draft.selectionMode === "ab"
+        ? "A/B test"
+        : "Create ad marker"
+  const description =
+    draft.selectionMode === "ab"
+      ? "Select which ads you'd like to A/B test"
+      : draft.selectionMode === "auto"
+        ? "Select the ads this marker can choose from during playback"
+        : "Select the exact ad this marker should play"
+  const canConfirm = isSelectionValid(
+    draft.selectionMode,
+    draft.selectedAdAssetIds
+  )
+  const handleUploadAdsClick = () => {
+    uploadInputRef.current?.click()
+  }
+  const handleAdFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.currentTarget.files ?? [])
+
+    event.currentTarget.value = ""
+
+    if (files.length === 0) {
+      return
+    }
+
+    void onUploadAds(files)
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[calc(100%-2rem)] sm:max-w-3xl p-0 gap-0 overflow-hidden" showCloseButton>
-        <DialogHeader className="px-6 pt-6 pb-5 md:px-8">
-          <DialogTitle>A/B test</DialogTitle>
-          <DialogDescription>
-            Select which ads you&apos;d like to A/B test
-          </DialogDescription>
+      <DialogContent
+        className="flex max-h-[min(720px,calc(100vh-5rem))] max-w-[calc(100%-2rem)] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl"
+        showCloseButton
+      >
+        <DialogHeader className="px-6 pt-10 pb-5 md:px-8">
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept="video/*"
+            multiple
+            className="hidden"
+            onChange={handleAdFileChange}
+          />
+          <div className="flex items-start gap-4">
+            <div className="min-w-0 flex-1 pr-8">
+              <DialogTitle>{title}</DialogTitle>
+              <DialogDescription>
+                {description}
+              </DialogDescription>
+            </div>
+            <Button
+              className="ml-auto shrink-0 cursor-pointer"
+              onClick={handleUploadAdsClick}
+            >
+              Upload Ad
+              <Plus />
+            </Button>
+          </div>
         </DialogHeader>
 
         <div className="mx-6 border-t border-zinc-200 md:mx-8" />
 
         <div className="flex min-h-0 flex-1 gap-0 overflow-hidden p-5 md:min-h-[420px]">
-          {/* Left panel — visible on md+ */}
           <div className="hidden md:flex w-52 shrink-0 flex-col gap-5 rounded-lg bg-zinc-100 p-5">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
@@ -57,6 +178,8 @@ export const AdLibraryDialog = ({
                 placeholder="Search library..."
                 className="bg-white pl-9"
                 autoComplete="off"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.currentTarget.value)}
               />
             </div>
             <nav className="flex flex-col gap-5">
@@ -73,13 +196,12 @@ export const AdLibraryDialog = ({
                   type="button"
                   className="flex items-center justify-between text-sm font-medium text-zinc-900"
                 >
-                  Eight Sleep
+                  Example ads
                   <ChevronDown className="size-4 text-zinc-400" />
                 </button>
                 <div className="ml-1 mt-3 flex flex-col gap-4 border-l border-zinc-300 pl-4">
-                  <span className="text-sm text-zinc-500">Pod 3</span>
-                  <span className="text-sm text-zinc-500">Q3 Promo</span>
-                  <span className="text-sm text-zinc-500">Athlete Campaign</span>
+                  <span className="text-sm text-zinc-500">90s</span>
+                  <span className="text-sm text-zinc-500">Classic</span>
                 </div>
               </div>
 
@@ -101,17 +223,23 @@ export const AdLibraryDialog = ({
             </nav>
           </div>
 
-          {/* Right panel — ad list */}
-          <div className="flex flex-1 flex-col gap-3 px-0 py-1 md:px-5">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 px-0 py-1 md:px-5">
             <div className="flex flex-wrap items-center gap-2 md:gap-3">
-              {/* Mobile folder selector — visible below md */}
               <Button variant="outline" size="lg" className="md:hidden">
                 <FolderOpen className="size-4" />
-                All folders
+                {draft.selectionMode === "ab"
+                  ? "A/B test"
+                  : draft.selectionMode === "auto"
+                    ? "Auto"
+                    : "Static"}
                 <ChevronDown className="size-3.5 text-zinc-400" />
               </Button>
-              <div className="flex-1" />
-              <Button variant="outline" size="lg" className="text-muted-foreground">
+              <Button
+                variant="outline"
+                size="lg"
+                className="text-muted-foreground"
+                onClick={() => setSortNewestFirst((currentValue) => !currentValue)}
+              >
                 <ChevronsUpDown className="size-4" />
                 Upload date
               </Button>
@@ -121,29 +249,62 @@ export const AdLibraryDialog = ({
                   placeholder="Search ads..."
                   className="w-32 pl-9 sm:w-44"
                   autoComplete="off"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.currentTarget.value)}
                 />
               </div>
             </div>
+            {uploadError ? (
+              <p className="text-sm text-red-600">{uploadError}</p>
+            ) : null}
 
-            <ScrollArea className="flex-1">
+            <ScrollArea className="min-h-0 flex-1">
               <div className="flex flex-col gap-4">
-                {adLibrary.map((ad) => (
-                  <AdCard key={ad.id} ad={ad} />
+                {visibleAds.map((ad) => (
+                  <AdCard
+                    key={ad.id}
+                    ad={ad}
+                    selected={draft.selectedAdAssetIds.includes(ad.id)}
+                    uploadProgress={
+                      uploadProgressByMediaAssetId[ad.mediaAsset.id]
+                    }
+                    onToggle={() =>
+                      onDraftChange({
+                        ...draft,
+                        selectedAdAssetIds: toggleSelection({
+                          selectionMode: draft.selectionMode,
+                          selectedAdAssetIds: draft.selectedAdAssetIds,
+                          adAssetId: ad.id,
+                        }),
+                      })
+                    }
+                  />
                 ))}
               </div>
             </ScrollArea>
           </div>
         </div>
 
-        {/* Footer */}
         <div className="mx-6 border-t border-zinc-200 md:mx-8" />
         <div className="flex items-center justify-between gap-3 px-6 py-5 md:px-8">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isSaving}
+          >
             Cancel
           </Button>
           <div className="flex items-center gap-3 md:gap-4">
-            <span className="shrink-0 text-sm text-zinc-500">0 ads selected</span>
-            <Button className="shrink-0">Create A/B test</Button>
+            <span className="shrink-0 text-sm text-zinc-500">
+              {draft.selectedAdAssetIds.length} ads selected
+            </span>
+            <Button
+              className="shrink-0"
+              onClick={onConfirm}
+              disabled={!canConfirm || isSaving}
+            >
+              {confirmLabel}
+            </Button>
           </div>
         </div>
       </DialogContent>
@@ -151,15 +312,49 @@ export const AdLibraryDialog = ({
   )
 }
 
-const AdCard = ({ ad }: { ad: AdLibraryItem }) => {
+const AdCard = ({
+  ad,
+  selected,
+  uploadProgress,
+  onToggle,
+}: {
+  ad: AdLibraryItem
+  selected: boolean
+  uploadProgress?: UploadProgressState
+  onToggle: () => void
+}) => {
   const duration = ad.mediaAsset.durationMs
     ? formatDuration(ad.mediaAsset.durationMs)
     : null
+  const createdAt = formatDate(ad.createdAt, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+  })
 
-  const tags = adTagMap[ad.title] ?? []
+  const tags = getAdTags(ad.title)
+  const isSelectable = ad.mediaAsset.status === "ready"
+  const statusLabel = uploadProgress
+    ? uploadProgress.phase === "uploading"
+      ? "Uploading"
+      : "Processing"
+    : ad.mediaAsset.status === "processing"
+      ? "Processing"
+      : ad.mediaAsset.status === "uploading"
+        ? "Uploading"
+        : ad.mediaAsset.status === "failed"
+          ? "Failed"
+          : undefined
 
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-zinc-200 bg-white p-3 sm:gap-4">
+    <div
+      className={`flex items-center gap-3 rounded-xl border p-3 sm:gap-4 ${
+        selected
+          ? "border-zinc-900 bg-zinc-50"
+          : "border-zinc-200 bg-white"
+      } ${isSelectable ? "cursor-pointer" : "opacity-70"}`}
+      onClick={isSelectable ? onToggle : undefined}
+    >
       <div className="hidden h-[72px] w-[96px] shrink-0 overflow-hidden rounded border border-zinc-300 bg-zinc-100 sm:block">
         {ad.mediaAsset.thumbnailUrl ? (
           <div className="relative h-full w-full">
@@ -182,17 +377,22 @@ const AdCard = ({ ad }: { ad: AdLibraryItem }) => {
       <div className="flex flex-1 flex-col gap-1.5">
         <span className="text-sm font-medium text-zinc-900">{ad.title}</span>
         <span className="flex flex-wrap items-center gap-1.5 text-xs text-zinc-400">
-          <span>13/03/24</span>
+          <span>{createdAt}</span>
           <span>•</span>
           <span>{duration}</span>
           <span className="text-zinc-300">—</span>
-          <Avatar size="sm" className="size-3.5">
-            <AvatarFallback className="bg-orange-200 text-[6px] text-orange-800">
-              D
+          <Avatar size="sm" className="size-2.5 border-0">
+            <AvatarFallback className="border-0 bg-[#FEC16B] text-[5px] font-medium text-[#7A3814]">
+              N
             </AvatarFallback>
           </Avatar>
-          <span className="text-zinc-600">Denis Loginoff</span>
+          <span className="font-medium text-zinc-700">Nick Lewis</span>
         </span>
+        {statusLabel ? (
+          <span className="text-xs font-medium text-zinc-500">
+            {statusLabel}
+          </span>
+        ) : null}
         {tags.length > 0 && (
           <div className="flex items-center gap-2">
             {tags.map((tag, i) => (
@@ -205,9 +405,51 @@ const AdCard = ({ ad }: { ad: AdLibraryItem }) => {
             ))}
           </div>
         )}
+        {uploadProgress ? (
+          <Progress value={uploadProgress.progressPercent} />
+        ) : null}
       </div>
 
-      <Checkbox className="size-4 border-zinc-900" />
+      <Checkbox
+        checked={selected}
+        disabled={!isSelectable}
+        className="size-4 border-zinc-900"
+      />
     </div>
   )
 }
+
+const isSelectionValid = (
+  selectionMode: Marker["selectionMode"],
+  selectedAdAssetIds: string[]
+) => {
+  if (selectionMode === "static") {
+    return selectedAdAssetIds.length === 1
+  }
+
+  if (selectionMode === "ab") {
+    return selectedAdAssetIds.length >= 2
+  }
+
+  return selectedAdAssetIds.length >= 1
+}
+
+const toggleSelection = ({
+  selectionMode,
+  selectedAdAssetIds,
+  adAssetId,
+}: {
+  selectionMode: Marker["selectionMode"]
+  selectedAdAssetIds: string[]
+  adAssetId: string
+}) => {
+  if (selectionMode === "static") {
+    return selectedAdAssetIds[0] === adAssetId ? [] : [adAssetId]
+  }
+
+  return selectedAdAssetIds.includes(adAssetId)
+    ? selectedAdAssetIds.filter((currentAdAssetId) => currentAdAssetId !== adAssetId)
+    : [...selectedAdAssetIds, adAssetId]
+}
+
+export type { MarkerDialogDraft }
