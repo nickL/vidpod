@@ -26,9 +26,18 @@ import {
 import { Input } from "@/components/ui/input"
 import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { formatDate, formatDuration } from "@/lib/utils"
+import { capitalize, cn, formatDate, formatDuration } from "@/lib/utils"
 
-import type { AdLibraryItem, Marker, UploadProgressState } from "./types"
+import type { MarkerDialogDraft } from "../markers/dialog-state"
+import type { AdLibraryItem, Marker, UploadProgressState } from "../types"
+
+const SELECTION_MODE_LABEL = { ab: "A/B test", auto: "Auto", static: "Static" } as const
+
+const SELECTION_MODE_DESCRIPTION = {
+  static: "Select the exact ad this marker should play",
+  auto: "Select the ads this marker can choose from during playback",
+  ab: "Select which ads you'd like to A/B test",
+} as const
 
 const getAdTags = (adTitle: string) => {
   if (adTitle.includes("(90s)")) {
@@ -54,12 +63,6 @@ type AdLibraryDialogProps = {
   onDraftChange: (draft: MarkerDialogDraft) => void
   onConfirm: () => void
   onUploadAds: (files: File[]) => void | Promise<void>
-}
-
-type MarkerDialogDraft = {
-  requestedTimeMs: number
-  selectionMode: Marker["selectionMode"]
-  selectedAdAssetIds: string[]
 }
 
 export const AdLibraryDialog = ({
@@ -97,26 +100,13 @@ export const AdLibraryDialog = ({
     })
   }, [adLibrary, searchQuery, sortNewestFirst])
 
-  const confirmLabel =
-    mode === "edit"
-      ? "Save changes"
-      : draft.selectionMode === "ab"
-        ? "Create A/B test"
-        : "Create marker"
-  const title =
-    mode === "edit"
-      ? draft.selectionMode === "ab"
-        ? "A/B test"
-        : "Edit ad marker"
-      : draft.selectionMode === "ab"
-        ? "A/B test"
-        : "Create ad marker"
-  const description =
-    draft.selectionMode === "ab"
-      ? "Select which ads you'd like to A/B test"
-      : draft.selectionMode === "auto"
-        ? "Select the ads this marker can choose from during playback"
-        : "Select the exact ad this marker should play"
+  const isAb = draft.selectionMode === "ab"
+  const isEdit = mode === "edit"
+
+  const title = isAb ? "A/B test" : isEdit ? "Edit ad marker" : "Create ad marker"
+  const confirmLabel = isEdit ? "Save changes" : isAb ? "Create A/B test" : "Create marker"
+  const description = SELECTION_MODE_DESCRIPTION[draft.selectionMode]
+
   const canConfirm = isSelectionValid(
     draft.selectionMode,
     draft.selectedAdAssetIds
@@ -133,7 +123,7 @@ export const AdLibraryDialog = ({
       return
     }
 
-    void onUploadAds(files)
+    onUploadAds(files)
   }
 
   return (
@@ -170,7 +160,7 @@ export const AdLibraryDialog = ({
 
         <div className="mx-6 border-t border-zinc-200 md:mx-8" />
 
-        <div className="flex min-h-0 flex-1 gap-0 overflow-hidden p-5 md:min-h-[420px]">
+        <div className="flex min-h-0 flex-1 gap-0 overflow-hidden p-5 md:min-h-105">
           <div className="hidden md:flex w-52 shrink-0 flex-col gap-5 rounded-lg bg-zinc-100 p-5">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-zinc-400" />
@@ -192,34 +182,25 @@ export const AdLibraryDialog = ({
               </span>
 
               <div className="flex flex-col">
-                <button
-                  type="button"
-                  className="flex items-center justify-between text-sm font-medium text-zinc-900"
-                >
+                <div className="flex items-center justify-between text-sm font-medium text-zinc-900">
                   Example ads
                   <ChevronDown className="size-4 text-zinc-400" />
-                </button>
+                </div>
                 <div className="ml-1 mt-3 flex flex-col gap-4 border-l border-zinc-300 pl-4">
                   <span className="text-sm text-zinc-500">90s</span>
                   <span className="text-sm text-zinc-500">Classic</span>
                 </div>
               </div>
 
-              <button
-                type="button"
-                className="flex items-center justify-between text-sm text-zinc-700"
-              >
+              <div className="flex items-center justify-between text-sm text-zinc-700">
                 Brilliant
                 <ChevronUp className="size-4 text-zinc-400" />
-              </button>
+              </div>
 
-              <button
-                type="button"
-                className="flex items-center justify-between text-sm text-zinc-700"
-              >
+              <div className="flex items-center justify-between text-sm text-zinc-700">
                 Milligram
                 <ChevronUp className="size-4 text-zinc-400" />
-              </button>
+              </div>
             </nav>
           </div>
 
@@ -227,11 +208,7 @@ export const AdLibraryDialog = ({
             <div className="flex flex-wrap items-center gap-2 md:gap-3">
               <Button variant="outline" size="lg" className="md:hidden">
                 <FolderOpen className="size-4" />
-                {draft.selectionMode === "ab"
-                  ? "A/B test"
-                  : draft.selectionMode === "auto"
-                    ? "Auto"
-                    : "Static"}
+                {SELECTION_MODE_LABEL[draft.selectionMode]}
                 <ChevronDown className="size-3.5 text-zinc-400" />
               </Button>
               <Button
@@ -258,8 +235,10 @@ export const AdLibraryDialog = ({
               <p className="text-sm text-red-600">{uploadError}</p>
             ) : null}
 
-            <ScrollArea className="min-h-0 flex-1">
-              <div className="flex flex-col gap-4">
+            <ScrollArea
+              className="min-h-0 flex-1 mask-[linear-gradient(to_bottom,black_calc(100%-3rem),transparent)] [-webkit-mask-image:linear-gradient(to_bottom,black_calc(100%-3rem),transparent)]"
+            >
+              <div className="flex flex-col gap-4 pb-8">
                 {visibleAds.map((ad) => (
                   <AdCard
                     key={ad.id}
@@ -335,27 +314,21 @@ const AdCard = ({
   const tags = getAdTags(ad.title)
   const isSelectable = ad.mediaAsset.status === "ready"
   const statusLabel = uploadProgress
-    ? uploadProgress.phase === "uploading"
-      ? "Uploading"
-      : "Processing"
-    : ad.mediaAsset.status === "processing"
-      ? "Processing"
-      : ad.mediaAsset.status === "uploading"
-        ? "Uploading"
-        : ad.mediaAsset.status === "failed"
-          ? "Failed"
-          : undefined
+    ? capitalize(uploadProgress.phase)
+    : ad.mediaAsset.status === "ready"
+      ? undefined
+      : capitalize(ad.mediaAsset.status)
 
   return (
     <div
-      className={`flex items-center gap-3 rounded-xl border p-3 sm:gap-4 ${
-        selected
-          ? "border-zinc-900 bg-zinc-50"
-          : "border-zinc-200 bg-white"
-      } ${isSelectable ? "cursor-pointer" : "opacity-70"}`}
+      className={cn(
+        "flex items-center gap-3 rounded-xl border p-3 sm:gap-4",
+        selected ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 bg-white",
+        isSelectable ? "cursor-pointer" : "opacity-70",
+      )}
       onClick={isSelectable ? onToggle : undefined}
     >
-      <div className="hidden h-[72px] w-[96px] shrink-0 overflow-hidden rounded border border-zinc-300 bg-zinc-100 sm:block">
+      <div className="hidden h-18 w-24 shrink-0 overflow-hidden rounded border border-zinc-300 bg-zinc-100 sm:block">
         {ad.mediaAsset.thumbnailUrl ? (
           <div className="relative h-full w-full">
             <Image
@@ -451,5 +424,3 @@ const toggleSelection = ({
     ? selectedAdAssetIds.filter((currentAdAssetId) => currentAdAssetId !== adAssetId)
     : [...selectedAdAssetIds, adAssetId]
 }
-
-export type { MarkerDialogDraft }

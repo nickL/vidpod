@@ -17,11 +17,11 @@ import {
 import { serverEnv } from "@/env/server"
 
 import {
-  getMarkerPlaybackReadiness,
+  canMarkerPlay,
   resolveMarkerVariant,
-} from "./playback-runtime"
+} from "../markers/marker-selection"
 
-import type { PlaybackMarker } from "./playback-runtime"
+import type { PlaybackMarker } from "../markers/marker-selection"
 import type {
   HlsPlan,
   Mp4Plan,
@@ -29,7 +29,7 @@ import type {
   PlaybackSession,
   PlaybackSessionStart,
   ResolvedPlaybackBreak,
-} from "./types"
+} from "../types"
 
 export type StartPlaybackSessionInput = {
   episodeId: string
@@ -105,6 +105,7 @@ const loadPlaybackMarkers = async (
     .select({
       id: adBreakVariants.id,
       adBreakId: adBreakVariants.adBreakId,
+      adAssetId: adBreakVariants.adAssetId,
       status: adBreakVariants.status,
       weight: adBreakVariants.weight,
       isControl: adBreakVariants.isControl,
@@ -129,6 +130,7 @@ const loadPlaybackMarkers = async (
     ...marker,
     variants: (variantsByMarkerId.get(marker.id) ?? []).map((variant) => ({
       id: variant.id,
+      adAssetId: variant.adAssetId,
       status: variant.status,
       weight: variant.weight ?? undefined,
       isControl: variant.isControl ?? undefined,
@@ -351,12 +353,7 @@ const createBreakResolutionRows = ({
   return markers
     .filter((marker) => !resolvedBreakIds.has(marker.id))
     .flatMap((marker) => {
-      const playbackReadiness = getMarkerPlaybackReadiness({
-        episodeDurationMs,
-        marker,
-      })
-
-      if (!playbackReadiness.canPlay) {
+      if (!canMarkerPlay({ episodeDurationMs, marker })) {
         return []
       }
 
@@ -372,6 +369,7 @@ const createBreakResolutionRows = ({
           playbackSessionId: playbackSession.id,
           adBreakId: marker.id,
           selectedVariantId: selectedVariant.id,
+          selectedAdAssetId: selectedVariant.adAssetId,
           selectionMode: marker.selectionMode,
         },
       ]
@@ -418,17 +416,9 @@ export const startPlaybackSession = async ({
   playheadTimeMs,
 }: StartPlaybackSessionInput): Promise<PlaybackSessionStart> => {
   const episodeDurationMs = await loadEpisodeDurationMs(episodeId)
-  let playbackSession = await loadActivePlaybackSession({
-    episodeId,
-    playbackSessionId,
-  })
-
-  if (!playbackSession) {
-    playbackSession = await createPlaybackSession({
-      episodeId,
-      playheadTimeMs,
-    })
-  }
+  const playbackSession =
+    (await loadActivePlaybackSession({ episodeId, playbackSessionId }))
+    ?? (await createPlaybackSession({ episodeId, playheadTimeMs }))
 
   const playbackMarkers = await loadPlaybackMarkers(episodeId)
 
@@ -444,13 +434,15 @@ export const startPlaybackSession = async ({
   }
 }
 
-export const invalidatePlaybackSessions = async (episodeId: string) => {
+export const endActivePlaybackSessions = async (episodeId: string) => {
+  const now = new Date()
+
   await db
     .update(playbackSessions)
     .set({
       status: "ended",
-      endedAt: new Date(),
-      updatedAt: new Date(),
+      endedAt: now,
+      updatedAt: now,
     })
     .where(
       and(

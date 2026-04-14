@@ -12,8 +12,8 @@ import {
 } from "@/db/schema"
 import { serverEnv } from "@/env/server"
 
-import { demoEpisodeMediaAssetId, isDemoEpisode } from "./demo"
-import { endActivePlaybackSessions } from "./playback-sessions"
+import { demoEpisodeMediaAssetId, isDemoEpisode } from "../demo"
+import { endActivePlaybackSessions } from "../playback/playback-sessions"
 
 import type {
   AdLibraryItem,
@@ -22,7 +22,7 @@ import type {
   UploadInitInput,
   UploadInitResult,
   UploadTarget,
-} from "./types"
+} from "../types"
 
 type CloudflareVideoDetails = {
   uid: string
@@ -41,6 +41,13 @@ type CloudflareErrorPayload = {
 }
 
 const CLOUDFLARE_API_BASE = "https://api.cloudflare.com/client/v4"
+const THUMBNAIL_HEIGHT_PX = 270
+
+const normalizeStreamHostname = (configuredSubdomain: string) => {
+  return configuredSubdomain
+    .replace(/^https?:\/\//, "")
+    .replace(/\/$/, "")
+}
 
 const runBatchQueries = async (queries: BatchItem<"pg">[]) => {
   if (queries.length === 0) {
@@ -66,11 +73,7 @@ const buildStreamPlaybackUrl = (
   const configuredSubdomain = serverEnv.cloudflareStreamCustomerSubdomain
 
   if (configuredSubdomain) {
-    const hostname = configuredSubdomain
-      .replace(/^https?:\/\//, "")
-      .replace(/\/$/, "")
-
-    return `https://${hostname}/${streamVideoId}/manifest/video.m3u8`
+    return `https://${normalizeStreamHostname(configuredSubdomain)}/${streamVideoId}/manifest/video.m3u8`
   }
 
   if (!referenceUrl) {
@@ -102,11 +105,7 @@ const buildThumbnailUrl = ({
   const configuredSubdomain = serverEnv.cloudflareStreamCustomerSubdomain
 
   if (configuredSubdomain) {
-    const hostname = configuredSubdomain
-      .replace(/^https?:\/\//, "")
-      .replace(/\/$/, "")
-
-    return `https://${hostname}/${streamVideoId}/thumbnails/thumbnail.jpg?time=${getDefaultThumbnailTimeSec(durationSeconds)}s&height=270`
+    return `https://${normalizeStreamHostname(configuredSubdomain)}/${streamVideoId}/thumbnails/thumbnail.jpg?time=${getDefaultThumbnailTimeSec(durationSeconds)}s&height=${THUMBNAIL_HEIGHT_PX}`
   }
 
   if (!referenceUrl) {
@@ -119,7 +118,7 @@ const buildThumbnailUrl = ({
     "time",
     `${getDefaultThumbnailTimeSec(durationSeconds)}s`
   )
-  reference.searchParams.set("height", "270")
+  reference.searchParams.set("height", `${THUMBNAIL_HEIGHT_PX}`)
 
   return reference.toString()
 }

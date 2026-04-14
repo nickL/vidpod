@@ -1,4 +1,14 @@
+import { motion } from "motion/react"
+
+import { duration } from "@/lib/animation"
+
 import { CONTENT_HORIZONTAL_INSET_PX, timeToPx } from "./shared"
+
+const PLAYING_RING_BREATH = {
+  opacity: [1, 0.55, 1],
+  duration: 1.8,
+  rowStagger: 0.12,
+}
 
 type PlayheadProps = {
   currentTimeMs: number
@@ -7,6 +17,7 @@ type PlayheadProps = {
   trackTopOffset: number
   trackHeight: number
   isDragging: boolean
+  isPlaying: boolean
   onDragStart: (event: React.PointerEvent<HTMLDivElement>) => void
   onDragMove: (event: React.PointerEvent<HTMLDivElement>) => void
   onDragEnd: (event: React.PointerEvent<HTMLDivElement>) => void
@@ -34,6 +45,7 @@ export const Playhead = ({
   trackTopOffset,
   trackHeight,
   isDragging,
+  isPlaying,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -71,14 +83,20 @@ export const Playhead = ({
         onPointerMove={onDragMove}
         onPointerUp={onDragEnd}
       >
-        <PlayheadHandle top={handleTop} />
+        <PlayheadHandle top={handleTop} isPlaying={isPlaying} />
         <PlayheadNeedle top={needleTop} height={needleHeight} />
       </div>
     </div>
   )
 }
 
-const PlayheadHandle = ({ top }: { top: number }) => {
+const PlayheadHandle = ({
+  top,
+  isPlaying,
+}: {
+  top: number
+  isPlaying: boolean
+}) => {
   return (
     <div className="absolute left-1/2 -translate-x-1/2" style={{ top }}>
       <svg
@@ -97,7 +115,7 @@ const PlayheadHandle = ({ top }: { top: number }) => {
 
         {Array.from({ length: HANDLE_DOT_GRID.rows }, (_, row) =>
           Array.from({ length: HANDLE_DOT_GRID.columns }, (_, col) => (
-            <circle
+            <motion.circle
               key={`${row}-${col}`}
               cx={HANDLE_SIZE / 2 + (col - 0.5) * HANDLE_DOT_GRID.columnGap}
               cy={
@@ -109,6 +127,20 @@ const PlayheadHandle = ({ top }: { top: number }) => {
               fill="none"
               stroke="#FAFAFA"
               strokeWidth={HANDLE_DOT_GRID.strokeWidth}
+              initial={{ opacity: 1 }}
+              animate={
+                isPlaying ? { opacity: PLAYING_RING_BREATH.opacity } : { opacity: 1 }
+              }
+              transition={
+                isPlaying
+                  ? {
+                      duration: PLAYING_RING_BREATH.duration,
+                      delay: row * PLAYING_RING_BREATH.rowStagger,
+                      repeat: Infinity,
+                      ease: "easeInOut",
+                    }
+                  : { duration: duration.base }
+              }
             />
           ))
         )}

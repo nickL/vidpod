@@ -1,6 +1,6 @@
 import "server-only"
 
-function readRequiredEnv(name: string) {
+const readRequiredEnv = (name: string) => {
   const value = process.env[name]
 
   if (!value) {
@@ -10,9 +10,7 @@ function readRequiredEnv(name: string) {
   return value
 }
 
-function readOptionalEnv(name: string) {
-  return process.env[name] || null
-}
+const readOptionalEnv = (name: string) => process.env[name] || null
 
 export const serverEnv = {
   get databaseUrl() {

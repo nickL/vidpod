@@ -1,5 +1,6 @@
 import Image from "next/image"
 import { cva } from "class-variance-authority"
+import { motion } from "motion/react"
 
 import { Spacer } from "@/components/ui/spacer"
 import { cn } from "@/lib/utils"
@@ -82,7 +83,7 @@ export const MarkerSegment = ({
   const staticThumbnailUrl = marker.variants[0]?.thumbnailUrl
 
   return (
-    <div
+    <motion.div
       draggable={false}
       data-selected={isSelected ? "true" : "false"}
       className={cn(
@@ -90,7 +91,19 @@ export const MarkerSegment = ({
         "touch-none select-none",
         isInteractive ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default"
       )}
-      style={{ flexGrow, flexBasis: 0 }}
+      style={{
+        flexGrow,
+        flexBasis: 0,
+        zIndex: isDragging ? 10 : undefined,
+      }}
+      animate={{
+        scale: isDragging ? 1.05 : 1,
+        y: isDragging ? -2 : 0,
+        filter: isDragging
+          ? "drop-shadow(0 6px 12px rgba(0,0,0,0.28))"
+          : "drop-shadow(0 0 0 rgba(0,0,0,0))",
+      }}
+      transition={{ type: "spring", stiffness: 420, damping: 28 }}
       onDragStart={(event) => {
         event.preventDefault()
       }}
@@ -112,7 +125,7 @@ export const MarkerSegment = ({
           <GripHandle mode={selectionMode} />
         </>
       )}
-    </div>
+    </motion.div>
   )
 }
 

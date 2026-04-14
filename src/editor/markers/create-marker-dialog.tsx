@@ -1,6 +1,6 @@
 "use client"
 
-import { CircleDot, Dices, EqualApproximately, Gauge } from "lucide-react"
+import { CircleDot, Dices, EqualApproximately, type LucideIcon } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -10,8 +10,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { cn } from "@/lib/utils"
 
-import type { Marker } from "./types"
+import type { Marker } from "../types"
 
 type CreateMarkerDialogProps = {
   open: boolean
@@ -25,7 +26,7 @@ const modeOptions: Array<{
   selectionMode: Marker["selectionMode"]
   title: string
   description: string
-  icon: typeof Dices
+  icon: LucideIcon
 }> = [
   {
     selectionMode: "auto",
@@ -96,7 +97,7 @@ export const CreateMarkerDialog = ({
 type ModeOptionCardProps = {
   title: string
   description: string
-  icon: typeof Gauge
+  icon: LucideIcon
   selected: boolean
   onSelect: () => void
 }
@@ -111,11 +112,12 @@ const ModeOptionCard = ({
   return (
     <button
       type="button"
-      className={`flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+      className={cn(
+        "flex w-full items-center gap-3 rounded-xl border px-4 py-3 text-left transition-colors",
         selected
           ? "border-zinc-900 bg-zinc-50"
-          : "border-zinc-200 bg-white hover:border-zinc-300"
-      }`}
+          : "border-zinc-200 bg-white hover:border-zinc-300",
+      )}
       onClick={onSelect}
     >
       <div className="flex size-10 shrink-0 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-700">
@@ -126,9 +128,10 @@ const ModeOptionCard = ({
         <span className="text-xs text-zinc-500">{description}</span>
       </div>
       <div
-        className={`flex size-4 shrink-0 items-center justify-center rounded-full border ${
-          selected ? "border-zinc-900" : "border-zinc-300"
-        }`}
+        className={cn(
+          "flex size-4 shrink-0 items-center justify-center rounded-full border",
+          selected ? "border-zinc-900" : "border-zinc-300",
+        )}
       >
         {selected ? <div className="size-2 rounded-full bg-zinc-900" /> : null}
       </div>

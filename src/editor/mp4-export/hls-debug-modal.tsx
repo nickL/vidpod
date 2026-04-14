@@ -14,6 +14,29 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+const HLS_JS_SUPPORTED = Hls.isSupported()
+
+const STATUS_CARD_STYLES = {
+  default: {
+    card: "border-zinc-200 bg-zinc-50",
+    icon: "text-zinc-700 ring-zinc-200",
+    text: "text-zinc-600",
+    title: "text-zinc-950",
+  },
+  success: {
+    card: "border-emerald-200 bg-emerald-50",
+    icon: "text-emerald-700 ring-emerald-200",
+    text: "text-emerald-800",
+    title: "text-emerald-950",
+  },
+  error: {
+    card: "border-red-200 bg-red-50",
+    icon: "text-red-700 ring-red-200",
+    text: "text-red-800",
+    title: "text-red-950",
+  },
+}
+
 type HLSDebugModalProps = {
   open: boolean
   manifestUrl?: string
@@ -62,26 +85,7 @@ const StatusCard = ({
   action?: ReactNode
   children: ReactNode
 }) => {
-  const styles = {
-    default: {
-      card: "border-zinc-200 bg-zinc-50",
-      icon: "text-zinc-700 ring-zinc-200",
-      text: "text-zinc-600",
-      title: "text-zinc-950",
-    },
-    success: {
-      card: "border-emerald-200 bg-emerald-50",
-      icon: "text-emerald-700 ring-emerald-200",
-      text: "text-emerald-800",
-      title: "text-emerald-950",
-    },
-    error: {
-      card: "border-red-200 bg-red-50",
-      icon: "text-red-700 ring-red-200",
-      text: "text-red-800",
-      title: "text-red-950",
-    },
-  }[tone]
+  const styles = STATUS_CARD_STYLES[tone]
 
   return (
     <div className={cn("flex items-start gap-3 rounded-2xl border px-4 py-3", styles.card)}>
@@ -119,20 +123,20 @@ export const HLSDebugModal = ({
   const supportsNativeHls = Boolean(
     videoElement?.canPlayType("application/vnd.apple.mpegurl")
   )
-  const supportsHlsJs = Hls.isSupported()
-  const supportsPlayback = !videoElement || supportsHlsJs || supportsNativeHls
+  const supportsPlayback = !videoElement || HLS_JS_SUPPORTED || supportsNativeHls
   const playbackError =
     playerError && manifestUrl && playerError.manifestUrl === manifestUrl
       ? playerError.message
       : undefined
   const copied = Boolean(manifestUrl && copiedUrl === manifestUrl)
-  const displayError =
-    error ??
-    (!manifestUrl
-      ? "HLS preview is not available."
-      : !supportsPlayback
-        ? "Browser unable to play HLS stream."
-        : playbackError)
+
+  const getDisplayError = () => {
+    if (error) return error
+    if (!manifestUrl) return "HLS preview is not available."
+    if (!supportsPlayback) return "Browser unable to play HLS stream."
+    return playbackError
+  }
+  const displayError = getDisplayError()
 
   useEffect(() => {
     if (!open) {
@@ -144,7 +148,7 @@ export const HLSDebugModal = ({
       return
     }
 
-    if (Hls.isSupported()) {
+    if (HLS_JS_SUPPORTED) {
       const hls = new Hls({
         enableInterstitialPlayback: true,
       })

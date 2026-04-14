@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query"
 
-import { episodeEditorQueryOptions } from "./query-options"
+import { episodeEditorQueryOptions } from "./queries"
 
 export const useEditorData = (episodeId: string) => {
   return useQuery(episodeEditorQueryOptions(episodeId))

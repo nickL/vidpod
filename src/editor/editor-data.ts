@@ -16,8 +16,8 @@ import {
 import { serverEnv } from "@/env/server"
 
 import { demoEpisodeMediaAssetId, isDemoEpisode } from "./demo"
-import { getMarkerPlaybackReadiness } from "./playback-runtime"
-import { ensureWaveformRequested } from "./waveform-jobs"
+import { canMarkerPlay } from "./markers/marker-selection"
+import { ensureWaveformRequested } from "./waveforms/waveform-jobs"
 
 import type { EditorData } from "./types"
 
@@ -114,23 +114,7 @@ const toEditorMarkerVariants = (
   }))
 }
 
-export const getDefaultEpisodeId = async () => {
-  const [episode] = await db
-    .select({
-      id: episodes.id,
-    })
-    .from(episodes)
-    .innerJoin(shows, eq(episodes.showId, shows.id))
-    .where(and(isNull(episodes.archivedAt), isNull(shows.archivedAt)))
-    .orderBy(asc(episodes.createdAt))
-    .limit(1)
-
-  return episode?.id
-}
-
-export const getEpisodeEditor = async (
-  episodeId: string
-): Promise<EditorData> => {
+const loadEditorEpisode = async (episodeId: string) => {
   const [episode] = await db
     .select({
       showId: shows.id,
@@ -168,6 +152,10 @@ export const getEpisodeEditor = async (
     throw new Error(`Episode not found: ${episodeId}`)
   }
 
+  return episode
+}
+
+const loadMarkersWithVariants = async (episodeId: string) => {
   const markerRows = await db
     .select({
       id: adBreaks.id,
@@ -213,7 +201,11 @@ export const getEpisodeEditor = async (
     markerVariantsByBreakId.set(variantRow.adBreakId, variants)
   }
 
-  const adLibraryRows = await db
+  return { markerRows, markerVariantsByBreakId }
+}
+
+const loadAdLibraryForShow = async (showId: string) => {
+  return db
     .select({
       id: adAssets.id,
       title: adAssets.title,
@@ -227,10 +219,12 @@ export const getEpisodeEditor = async (
     })
     .from(adAssets)
     .innerJoin(mediaAssets, eq(adAssets.mediaAssetId, mediaAssets.id))
-    .where(eq(adAssets.showId, episode.showId))
+    .where(eq(adAssets.showId, showId))
     .orderBy(asc(adAssets.createdAt))
+}
 
-  const episodeVideoRows = await db
+const loadEpisodeVideoCandidates = async (episodeId: string) => {
+  return db
     .select({
       id: episodeVideoAssets.id,
       title: episodeVideoAssets.title,
@@ -246,6 +240,29 @@ export const getEpisodeEditor = async (
     .innerJoin(mediaAssets, eq(episodeVideoAssets.mediaAssetId, mediaAssets.id))
     .where(eq(episodeVideoAssets.episodeId, episodeId))
     .orderBy(desc(episodeVideoAssets.createdAt))
+}
+
+export const getDefaultEpisodeId = async () => {
+  const [episode] = await db
+    .select({
+      id: episodes.id,
+    })
+    .from(episodes)
+    .innerJoin(shows, eq(episodes.showId, shows.id))
+    .where(and(isNull(episodes.archivedAt), isNull(shows.archivedAt)))
+    .orderBy(asc(episodes.createdAt))
+    .limit(1)
+
+  return episode?.id
+}
+
+export const getEpisodeEditor = async (
+  episodeId: string
+): Promise<EditorData> => {
+  const episode = await loadEditorEpisode(episodeId)
+  const { markerRows, markerVariantsByBreakId } = await loadMarkersWithVariants(episodeId)
+  const adLibraryRows = await loadAdLibraryForShow(episode.showId)
+  const episodeVideoRows = await loadEpisodeVideoCandidates(episodeId)
 
   const canResetDemo =
     isDemoEpisode(episodeId) &&
@@ -286,7 +303,7 @@ export const getEpisodeEditor = async (
     markers: markerRows.map((row) => {
       const markerVariants = markerVariantsByBreakId.get(row.id) ?? []
       const variants = toEditorMarkerVariants(markerVariants)
-      const playbackReadiness = getMarkerPlaybackReadiness({
+      const canPlay = canMarkerPlay({
         episodeDurationMs,
         marker: {
           id: row.id,
@@ -311,7 +328,7 @@ export const getEpisodeEditor = async (
         status: row.status,
         label: row.label ?? undefined,
         variants,
-        playbackReadiness,
+        canPlay,
       }
     }),
     mainMediaAsset: episode.mainMediaAssetId

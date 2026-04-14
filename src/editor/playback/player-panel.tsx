@@ -16,9 +16,9 @@ import {
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { duration } from "@/lib/animation"
-import { cn } from "@/lib/utils"
+import { capitalize, cn } from "@/lib/utils"
 
-import type { EpisodeVideoAsset, UploadProgressState } from "./types"
+import type { EpisodeVideoAsset, UploadProgressState } from "../types"
 
 const SKIP_INTERVAL_MS = 10_000
 const JUMP_INTERVAL_MS = 30_000
@@ -36,7 +36,9 @@ type PlayerPanelProps = {
   uploadError?: string
   videoUploadProgress?: UploadProgressState
   canPreviewHls: boolean
+  canResetDemo: boolean
   isPreparingPreview: boolean
+  isResettingDemo: boolean
   setVideoRef: (node: HTMLVideoElement | null) => void
   onDurationChange: () => void
   onLoadedMetadata: () => void
@@ -46,13 +48,14 @@ type PlayerPanelProps = {
   onVideoPlay: () => void
   onVideoPause: () => void
   onJumpBy: (deltaMs: number) => void
-  onSeekToStart: () => void
-  onSeekToEnd: () => void
+  onJumpToStart: () => void
+  onJumpToEnd: () => void
   onTogglePlayback: () => void | Promise<void>
   onPreviewHls: () => void | Promise<void>
   onAddEpisodeVideo: (file: File) => void | Promise<void>
+  onResetDemo: () => void | Promise<void>
   onRemoveEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
-  onUseEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
+  onSelectEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
 }
 
 export const PlayerPanel = ({
@@ -63,7 +66,9 @@ export const PlayerPanel = ({
   uploadError,
   videoUploadProgress,
   canPreviewHls,
+  canResetDemo,
   isPreparingPreview,
+  isResettingDemo,
   setVideoRef,
   onDurationChange,
   onLoadedMetadata,
@@ -73,14 +78,17 @@ export const PlayerPanel = ({
   onVideoPlay,
   onVideoPause,
   onJumpBy,
-  onSeekToStart,
-  onSeekToEnd,
+  onJumpToStart,
+  onJumpToEnd,
   onTogglePlayback,
   onPreviewHls,
   onAddEpisodeVideo,
+  onResetDemo,
   onRemoveEpisodeVideo,
-  onUseEpisodeVideo,
+  onSelectEpisodeVideo,
 }: PlayerPanelProps) => {
+
+  
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
   const transportDisabled = !playbackUrl || Boolean(error)
   const isEpisodeUploadActive =
@@ -107,7 +115,16 @@ export const PlayerPanel = ({
 
   return (
     <section className="@container flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8">
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center gap-2">
+        {canResetDemo ? (
+          <Button
+            variant="outline"
+            disabled={isEpisodeUploadActive || isResettingDemo}
+            onClick={() => void onResetDemo()}
+          >
+            {isResettingDemo ? "Resetting demo…" : "Reset demo"}
+          </Button>
+        ) : null}
         <input
           ref={uploadInputRef}
           type="file"
@@ -115,22 +132,24 @@ export const PlayerPanel = ({
           className="hidden"
           onChange={handleVideoFileChange}
         />
-        {canPreviewHls ? (
+        <div className="ml-auto flex items-center gap-2">
+          {canPreviewHls ? (
+            <Button
+              variant="outline"
+              disabled={!playbackUrl || isPreparingPreview}
+              onClick={() => void onPreviewHls()}
+            >
+              {isPreparingPreview ? "Preparing HLS…" : "Preview HLS"}
+            </Button>
+          ) : null}
           <Button
-            variant="outline"
-            disabled={!playbackUrl || isPreparingPreview}
-            onClick={() => void onPreviewHls()}
+            disabled={isEpisodeUploadActive}
+            onClick={handleAddVideoClick}
           >
-            {isPreparingPreview ? "Preparing HLS…" : "Preview HLS"}
+            <RiAddLine />
+            Add new video
           </Button>
-        ) : null}
-        <Button
-          disabled={isEpisodeUploadActive}
-          onClick={handleAddVideoClick}
-        >
-          <RiAddLine />
-          Add new video
-        </Button>
+        </div>
       </div>
       {uploadError ? (
         <p className="text-sm text-red-600">{uploadError}</p>
@@ -152,7 +171,7 @@ export const PlayerPanel = ({
           />
         ) : (
           <div className="flex aspect-video items-center justify-center px-8 text-center text-sm text-zinc-400">
-            Main media playback is unavailable for this episode.
+            Error: media playback not unavailable for this video.
           </div>
         )}
       </div>
@@ -163,7 +182,7 @@ export const PlayerPanel = ({
             episodeVideoAsset={replacementEpisodeVideo}
             uploadProgress={videoUploadProgress}
             onRemove={() => onRemoveEpisodeVideo(replacementEpisodeVideo.id)}
-            onUse={() => onUseEpisodeVideo(replacementEpisodeVideo.id)}
+            onUse={() => onSelectEpisodeVideo(replacementEpisodeVideo.id)}
           />
         </div>
       ) : null}
@@ -171,13 +190,13 @@ export const PlayerPanel = ({
       <TransportControls
         isPlaying={isPlaying}
         disabled={transportDisabled}
-        onJumpToStart={onSeekToStart}
+        onJumpToStart={onJumpToStart}
         onSkipBack={skipBack}
         onRewind={rewind}
         onTogglePlayback={onTogglePlayback}
         onFastForward={fastForward}
         onSkipForward={skipForward}
-        onJumpToEnd={onSeekToEnd}
+        onJumpToEnd={onJumpToEnd}
       />
     </section>
   )
@@ -195,20 +214,8 @@ const EpisodeVideoCandidate = ({
   onUse: () => void | Promise<void>
 }) => {
   const isReady = episodeVideoAsset.mediaAsset.status === "ready"
-  const canDiscard =
-    episodeVideoAsset.mediaAsset.status === "ready" ||
-    episodeVideoAsset.mediaAsset.status === "failed"
-  const statusLabel = uploadProgress
-    ? uploadProgress.phase === "uploading"
-      ? "Uploading"
-      : "Processing"
-    : episodeVideoAsset.mediaAsset.status === "failed"
-      ? "Failed"
-      : episodeVideoAsset.mediaAsset.status === "processing"
-        ? "Processing"
-        : episodeVideoAsset.mediaAsset.status === "uploading"
-          ? "Uploading"
-          : "Ready"
+  const canDiscard = isReady || episodeVideoAsset.mediaAsset.status === "failed"
+  const statusLabel = capitalize(uploadProgress?.phase ?? episodeVideoAsset.mediaAsset.status)
 
   return (
     <div className="flex flex-col gap-3 rounded-xl border border-zinc-200 bg-white p-4">
@@ -265,17 +272,17 @@ const TransportControls = ({
 }: TransportControlsProps) => {
   return (
     <div className="flex items-center justify-between gap-2 rounded-2xl border border-zinc-200 px-4 py-2 @[26rem]:gap-4 @[26rem]:px-6">
-      <JumpToStartButton onClick={onJumpToStart} disabled={disabled} />
-      <SkipBackButton onClick={onSkipBack} disabled={disabled} />
-      <RewindButton onClick={onRewind} disabled={disabled} />
+      <JumpToEdgeButton direction="start" onClick={onJumpToStart} disabled={disabled} />
+      <SkipButton       direction="back"  onClick={onSkipBack}    disabled={disabled} />
+      <LongJumpButton   direction="back"  onClick={onRewind}      disabled={disabled} />
       <PlayPauseButton
         isPlaying={isPlaying}
         onClick={onTogglePlayback}
         disabled={disabled}
       />
-      <FastForwardButton onClick={onFastForward} disabled={disabled} />
-      <SkipForwardButton onClick={onSkipForward} disabled={disabled} />
-      <JumpToEndButton onClick={onJumpToEnd} disabled={disabled} />
+      <LongJumpButton   direction="forward" onClick={onFastForward} disabled={disabled} />
+      <SkipButton       direction="forward" onClick={onSkipForward} disabled={disabled} />
+      <JumpToEdgeButton direction="end"     onClick={onJumpToEnd}   disabled={disabled} />
     </div>
   )
 }
@@ -285,74 +292,70 @@ type TransportButtonProps = {
   disabled?: boolean
 }
 
-const JumpToStartButton = ({ onClick, disabled }: TransportButtonProps) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    aria-label="Jump to start"
-    className={cn("flex items-center gap-2", transportButtonClasses)}
-  >
+const JumpToEdgeButton = ({
+  direction,
+  onClick,
+  disabled,
+}: TransportButtonProps & { direction: "start" | "end" }) => {
+  const isStart = direction === "start"
+  const Icon = isStart ? RiContractLeftFill : RiContractRightFill
+  const label = isStart ? "Jump to start" : "Jump to end"
+  const iconNode = (
     <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-zinc-300">
-      <RiContractLeftFill className="size-5 text-zinc-800" />
+      <Icon className="size-5 text-zinc-800" />
     </span>
+  )
+  const labelNode = (
     <span className="hidden whitespace-nowrap text-sm text-zinc-500 min-[1600px]:inline">
-      Jump to start
+      {label}
     </span>
-  </button>
-)
-
-const JumpToEndButton = ({ onClick, disabled }: TransportButtonProps) => (
-  <button
-    type="button"
-    onClick={onClick}
-    disabled={disabled}
-    aria-label="Jump to end"
-    className={cn("flex items-center gap-2", transportButtonClasses)}
-  >
-    <span className="hidden whitespace-nowrap text-sm text-zinc-500 min-[1600px]:inline">
-      Jump to end
-    </span>
-    <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-zinc-300">
-      <RiContractRightFill className="size-5 text-zinc-800" />
-    </span>
-  </button>
-)
-
-const SkipBackButton = ({ onClick, disabled }: TransportButtonProps) => {
-  const holdHandlers = usePressAndHold(onClick)
+  )
   return (
     <button
       type="button"
+      onClick={onClick}
       disabled={disabled}
-      aria-label="Skip back 10 seconds"
+      aria-label={label}
       className={cn("flex items-center gap-2", transportButtonClasses)}
-      {...holdHandlers}
     >
-      <RiHistoryFill className="size-5 shrink-0 text-zinc-800" />
-      <span className="whitespace-nowrap text-sm text-zinc-500">10s</span>
+      {isStart ? iconNode : labelNode}
+      {isStart ? labelNode : iconNode}
     </button>
   )
 }
 
-const SkipForwardButton = ({ onClick, disabled }: TransportButtonProps) => {
+const SkipButton = ({
+  direction,
+  onClick,
+  disabled,
+}: TransportButtonProps & { direction: "back" | "forward" }) => {
   const holdHandlers = usePressAndHold(onClick)
+  const isBack = direction === "back"
+  const iconNode = (
+    <RiHistoryFill className={cn("size-5 shrink-0 text-zinc-800", !isBack && "-scale-x-100")} />
+  )
+  const labelNode = <span className="whitespace-nowrap text-sm text-zinc-500">10s</span>
   return (
     <button
       type="button"
       disabled={disabled}
-      aria-label="Skip forward 10 seconds"
+      aria-label={isBack ? "Skip back 10 seconds" : "Skip forward 10 seconds"}
       className={cn("flex items-center gap-2", transportButtonClasses)}
       {...holdHandlers}
     >
-      <span className="whitespace-nowrap text-sm text-zinc-500">10s</span>
-      <RiHistoryFill className="size-5 shrink-0 -scale-x-100 text-zinc-800" />
+      {isBack ? iconNode : labelNode}
+      {isBack ? labelNode : iconNode}
     </button>
   )
 }
 
-const RewindButton = ({ onClick, disabled }: TransportButtonProps) => {
+const LongJumpButton = ({
+  direction,
+  onClick,
+  disabled,
+}: TransportButtonProps & { direction: "back" | "forward" }) => {
   const holdHandlers = usePressAndHold(onClick)
+  const Icon = direction === "back" ? RiRewindMiniFill : RiSpeedMiniFill
   return (
     <button
       type="button"
@@ -360,21 +363,7 @@ const RewindButton = ({ onClick, disabled }: TransportButtonProps) => {
       className={transportButtonClasses}
       {...holdHandlers}
     >
-      <RiRewindMiniFill className="size-7 text-zinc-900" />
-    </button>
-  )
-}
-
-const FastForwardButton = ({ onClick, disabled }: TransportButtonProps) => {
-  const holdHandlers = usePressAndHold(onClick)
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      className={transportButtonClasses}
-      {...holdHandlers}
-    >
-      <RiSpeedMiniFill className="size-7 text-zinc-900" />
+      <Icon className="size-7 text-zinc-900" />
     </button>
   )
 }
@@ -447,6 +436,7 @@ const usePressAndHold = (action: () => void | Promise<void>) => {
     onPointerLeave: stop,
     onPointerCancel: stop,
     onClick: () => {
+      // skip the trailing click - pointerdown already fired.
       if (pointerFiredRef.current) {
         pointerFiredRef.current = false
         return

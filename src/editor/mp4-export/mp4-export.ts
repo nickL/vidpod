@@ -2,13 +2,9 @@ import "server-only"
 
 import { serverEnv } from "@/env/server"
 
-import { getMp4Plan } from "./playback-sessions"
+import { getMp4Plan } from "../playback/playback-sessions"
 
-import type { Mp4Export } from "./types"
-
-const trimTrailingSlash = (value: string) => {
-  return value.replace(/\/$/, "")
-}
+import type { Mp4Export } from "../types"
 
 const getExportError = async (response: Response) => {
   try {
@@ -32,7 +28,7 @@ export const generateMp4Export = async (
 
   const plan = await getMp4Plan(playbackSessionId)
   const response = await fetch(
-    `${trimTrailingSlash(transcoderUrl)}/exports/mp4`,
+    `${transcoderUrl.replace(/\/$/, "")}/exports/mp4`,
     {
       method: "POST",
       headers: {

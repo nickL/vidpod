@@ -3,13 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import Hls from "hls.js"
 
-import { clampTimeMs, msToSeconds, secondsToMs } from "./time"
+import { clampTimeMs, msToSeconds, secondsToMs } from "../time"
 
 import type {
   PlaybackEventInput,
   PlaybackSessionStart,
   ResolvedPlaybackBreak,
-} from "./types"
+} from "../types"
 
 type UsePlaybackOptions = {
   playbackUrl?: string
@@ -223,6 +223,7 @@ export const usePlayback = ({
       shouldPlay: boolean
     }) => {
       const nextTimeMs = clampTimeMs(timeMs, durationMs)
+      const video = videoRef.current
 
       clearPreviewSeekTimeout()
       pendingPreviewTimeRef.current = undefined
@@ -231,6 +232,7 @@ export const usePlayback = ({
       lastEpisodeTimeMsRef.current = nextTimeMs
       syncPlayedBreaks(nextTimeMs)
       updateScrubTime(nextTimeMs)
+      video?.pause()
       setActivePlaybackSource({
         kind: "episode",
       })
@@ -289,6 +291,20 @@ export const usePlayback = ({
     },
     [logPlaybackEvent, switchToEpisodePlayback]
   )
+
+  useEffect(() => {
+    if (activePlaybackSource.kind !== "ad" || activePlaybackUrl) {
+      return
+    }
+
+    finishActiveAd({
+      eventType: "ad_failed",
+      metadataJson: {
+        reason: "playback_unavailable",
+      },
+      shouldPlay: shouldAutoplayRef.current,
+    })
+  }, [activePlaybackSource, activePlaybackUrl, finishActiveAd])
 
   useEffect(() => {
     const video = videoRef.current
@@ -522,6 +538,10 @@ export const usePlayback = ({
       return
     }
 
+    if (pendingSourceTimeRef.current !== undefined) {
+      return
+    }
+
     const nextTimeMs = secondsToMs(video.currentTime)
     const triggeredBreak = findTriggeredBreak({
       previousTimeMs: lastEpisodeTimeMsRef.current,
@@ -635,6 +655,12 @@ export const usePlayback = ({
 
     try {
       await startPlaybackSessionIfNeeded()
+
+      if (pendingSourceTimeRef.current !== undefined) {
+        shouldAutoplayRef.current = true
+        setPlaybackError(undefined)
+        return
+      }
 
       if (!video.paused) {
         return

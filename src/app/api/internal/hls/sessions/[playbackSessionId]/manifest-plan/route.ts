@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server"
 
 import { serverEnv } from "@/env/server"
-import { getHlsPlan } from "@/editor/playback-sessions"
+import { getHlsPlan } from "@/editor/playback/playback-sessions"
 
 export const dynamic = "force-dynamic"
 

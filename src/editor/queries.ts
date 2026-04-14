@@ -1,3 +1,5 @@
+import { queryOptions } from "@tanstack/react-query"
+
 import type { EditorData } from "./types"
 
 export const getEpisodeEditorUrl = (episodeId: string) => {
@@ -12,4 +14,15 @@ export const fetchEpisodeEditor = async (episodeId: string) => {
   }
 
   return response.json() as Promise<EditorData>
+}
+
+export const episodeEditorQueryKey = (episodeId: string) => {
+  return ["episode-editor", episodeId] as const
+}
+
+export const episodeEditorQueryOptions = (episodeId: string) => {
+  return queryOptions({
+    queryKey: episodeEditorQueryKey(episodeId),
+    queryFn: () => fetchEpisodeEditor(episodeId),
+  })
 }

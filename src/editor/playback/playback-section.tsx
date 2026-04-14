@@ -1,15 +1,15 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
   generateMp4ExportAction,
   recordPlaybackEventAction,
   startPlaybackSessionAction,
-} from "./actions"
-import { HLSDebugModal } from "./hls-debug-modal"
+} from "../actions"
+import { HLSDebugModal } from "../mp4-export/hls-debug-modal"
 import { PlayerPanel } from "./player-panel"
-import { Timeline } from "./timeline"
+import { Timeline } from "../timeline"
 import { usePlayback } from "./use-playback"
 
 import type {
@@ -18,7 +18,7 @@ import type {
   MarkerActivation,
   MediaAsset,
   UploadProgressState,
-} from "./types"
+} from "../types"
 
 type PlaybackSectionProps = {
   episodeId: string
@@ -28,6 +28,8 @@ type PlaybackSectionProps = {
   replacementEpisodeVideo?: EpisodeVideoAsset
   uploadError?: string
   videoUploadProgress?: UploadProgressState
+  canResetDemo: boolean
+  isResettingDemo: boolean
   markers: Marker[]
   previewConfigKey: string
   markerActivation?: MarkerActivation
@@ -41,7 +43,9 @@ type PlaybackSectionProps = {
   onRedo: () => void | Promise<void>
   onDisplayTimeChange: (timeMs: number) => void
   onAddEpisodeVideo: (file: File) => void | Promise<void>
-  onUseEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
+  onResetDemo: () => void | Promise<void>
+  onRemoveEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
+  onSelectEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
 }
 
 const getPlaybackSessionStorageKey = (episodeId: string) => {
@@ -56,6 +60,8 @@ export const PlaybackSection = ({
   replacementEpisodeVideo,
   uploadError,
   videoUploadProgress,
+  canResetDemo,
+  isResettingDemo,
   markers,
   previewConfigKey,
   markerActivation,
@@ -69,8 +75,12 @@ export const PlaybackSection = ({
   onRedo,
   onDisplayTimeChange,
   onAddEpisodeVideo,
-  onUseEpisodeVideo,
+  onResetDemo,
+  onRemoveEpisodeVideo,
+  onSelectEpisodeVideo,
 }: PlaybackSectionProps) => {
+
+
   const previewConfigKeyRef = useRef(previewConfigKey)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [isPreparingPreview, setIsPreparingPreview] = useState(false)
@@ -80,6 +90,8 @@ export const PlaybackSection = ({
   const [previewError, setPreviewError] = useState<string>()
   const [downloadUrl, setDownloadUrl] = useState<string>()
   const [downloadError, setDownloadError] = useState<string>()
+
+
   const startPlaybackSession = useCallback(
     async (playheadTimeMs: number) => {
       const requestConfigKey = previewConfigKeyRef.current
@@ -92,6 +104,7 @@ export const PlaybackSection = ({
         playheadTimeMs,
       })
 
+      // Note: The preview config changed mid-request, so don't persist a session ID against wrong config.
       if (requestConfigKey === previewConfigKeyRef.current) {
         window.sessionStorage.setItem(storageKey, playbackSessionStart.session.id)
       }
@@ -100,9 +113,7 @@ export const PlaybackSection = ({
     },
     [episodeId]
   )
-  const normalizedHlsBaseUrl = useMemo(() => {
-    return hlsBaseUrl?.replace(/\/$/, "")
-  }, [hlsBaseUrl])
+  const normalizedHlsBaseUrl = hlsBaseUrl?.replace(/\/$/, "")
   const {
     currentTimeMs,
     durationMs,
@@ -157,7 +168,10 @@ export const PlaybackSection = ({
     seekToTime(markerActivation.requestedTimeMs)
   }, [markerActivation, seekToTime])
 
-  usePlayPauseShortcut(togglePlayback)
+
+  // Toggle Playback via Spacebar
+  useSpacebarPlayPause(togglePlayback)
+
 
   const openPreview = useCallback(async () => {
     if (!normalizedHlsBaseUrl) {
@@ -183,7 +197,7 @@ export const PlaybackSection = ({
     } catch {
       setPreviewSessionId(undefined)
       setPreviewManifestUrl(undefined)
-      setPreviewError("Unable to prepare HLS preview.")
+      setPreviewError("Uh oh - Error preparing HLS preview (Try again)")
     } finally {
       setIsPreparingPreview(false)
     }
@@ -202,10 +216,12 @@ export const PlaybackSection = ({
 
       setDownloadUrl(exportResult.downloadUrl)
     } catch (error) {
+      
       setDownloadUrl(undefined)
       setDownloadError(
         error instanceof Error ? error.message : "Unable to generate MP4."
       )
+      
     } finally {
       setIsGeneratingMp4(false)
     }
@@ -237,7 +253,9 @@ export const PlaybackSection = ({
         uploadError={uploadError}
         videoUploadProgress={videoUploadProgress}
         canPreviewHls={Boolean(normalizedHlsBaseUrl && mainMediaAsset?.playbackUrl)}
+        canResetDemo={canResetDemo}
         isPreparingPreview={isPreparingPreview}
+        isResettingDemo={isResettingDemo}
         setVideoRef={setVideoRef}
         onDurationChange={handleDurationChange}
         onLoadedMetadata={handleLoadedMetadata}
@@ -247,12 +265,14 @@ export const PlaybackSection = ({
         onVideoPause={handleVideoPause}
         onVideoPlay={handleVideoPlay}
         onJumpBy={jumpBy}
-        onSeekToStart={seekToStart}
-        onSeekToEnd={seekToEnd}
+        onJumpToStart={seekToStart}
+        onJumpToEnd={seekToEnd}
         onTogglePlayback={togglePlayback}
         onPreviewHls={openPreview}
         onAddEpisodeVideo={onAddEpisodeVideo}
-        onUseEpisodeVideo={onUseEpisodeVideo}
+        onResetDemo={onResetDemo}
+        onRemoveEpisodeVideo={onRemoveEpisodeVideo}
+        onSelectEpisodeVideo={onSelectEpisodeVideo}
       />
       <HLSDebugModal
         open={isPreviewOpen}
@@ -270,6 +290,7 @@ export const PlaybackSection = ({
         displayTimeMs={displayTimeMs}
         durationMs={durationMs}
         waveform={mainMediaAsset?.waveform}
+        isPlaying={isPlaying}
         markerActivation={markerActivation}
         selectedMarkerId={selectedMarkerId}
         canUndo={canUndo}
@@ -287,10 +308,15 @@ export const PlaybackSection = ({
   )
 }
 
+
+/* Spacebar Playback Toggling */
+
+// Note: Don't steal spacebar when focus is within an editable input (e.g typing, slider, etc).
+
 const EDITABLE_TARGET_SELECTOR =
   'input, textarea, select, button, [contenteditable="true"], [role="button"], [role="slider"], [role="textbox"], [role="menuitem"]'
 
-const usePlayPauseShortcut = (togglePlayback: () => void | Promise<void>) => {
+const useSpacebarPlayPause = (togglePlayback: () => void | Promise<void>) => {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.code !== "Space") {

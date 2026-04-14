@@ -35,6 +35,7 @@ export type AdLibraryItem = {
   id: string
   title: string
   status: "active" | "archived"
+  createdAt: string
   mediaAsset: {
     id: string
     streamVideoId: string
@@ -55,25 +56,11 @@ export type MarkerVariant = {
   id: string
   adAssetId: string
   adAssetTitle: string
+  thumbnailUrl?: string
   ordinal: number
   status: "active" | "paused"
   weight?: number
   isControl?: boolean
-}
-
-export type MarkerPlaybackReasonCode =
-  | "needs_variant"
-  | "needs_more_variants_for_ab"
-  | "asset_unavailable"
-  | "invalid_break_time"
-  | "invalid_static_variant_count"
-
-export type MarkerPlaybackReasonSeverity = "guidance" | "warning"
-
-export type MarkerPlaybackReadiness = {
-  canPlay: boolean
-  reasonCode?: MarkerPlaybackReasonCode
-  reasonSeverity?: MarkerPlaybackReasonSeverity
 }
 
 export type Marker = {
@@ -83,7 +70,7 @@ export type Marker = {
   status: "draft" | "active"
   label?: string
   variants: MarkerVariant[]
-  playbackReadiness: MarkerPlaybackReadiness
+  canPlay: boolean
 }
 
 export type MarkerActivation = {

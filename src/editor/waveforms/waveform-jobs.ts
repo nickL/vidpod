@@ -4,7 +4,7 @@ import { db } from "@/db"
 import { mediaWaveforms } from "@/db/schema"
 import { serverEnv } from "@/env/server"
 
-import type { MediaWaveform } from "./types"
+import type { MediaWaveform } from "../types"
 
 const DEFAULT_WAVEFORM_BUCKET_COUNT = 1024
 
@@ -37,8 +37,6 @@ export type WaveformStateUpdate =
   | ProcessingWaveformUpdate
   | ReadyWaveformUpdate
   | FailedWaveformUpdate
-
-const trimTrailingSlash = (value: string) => value.replace(/\/$/, "")
 
 const getErrorMessage = (error: unknown, fallbackMessage: string) => {
   return error instanceof Error && error.message
@@ -74,7 +72,7 @@ const enqueueWaveformJob = async (job: GenerateWaveformJob) => {
   }
 
   const response = await fetch(
-    `${trimTrailingSlash(workerBaseUrl)}/enqueue-waveform`,
+    `${workerBaseUrl.replace(/\/$/, "")}/enqueue-waveform`,
     {
       method: "POST",
       headers: {
@@ -94,36 +92,42 @@ const enqueueWaveformJob = async (job: GenerateWaveformJob) => {
   }
 }
 
-export const markWaveformPending = async (mediaAssetId: string) => {
-  const now = new Date()
-
+const upsertWaveformState = async ({
+  mediaAssetId,
+  insert,
+  update,
+}: {
+  mediaAssetId: string
+  insert: Omit<typeof mediaWaveforms.$inferInsert, "mediaAssetId">
+  update: Partial<typeof mediaWaveforms.$inferInsert>
+}) => {
   await db
     .insert(mediaWaveforms)
-    .values({
-      mediaAssetId,
-      status: "pending",
-      peaks: null,
-      bucketCount: null,
-      lastError: null,
-      requestedAt: now,
-      startedAt: null,
-      completedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    })
+    .values({ mediaAssetId, ...insert })
     .onConflictDoUpdate({
       target: mediaWaveforms.mediaAssetId,
-      set: {
-        status: "pending",
-        peaks: null,
-        bucketCount: null,
-        lastError: null,
-        requestedAt: now,
-        startedAt: null,
-        completedAt: null,
-        updatedAt: now,
-      },
+      set: update,
     })
+}
+
+export const markWaveformPending = async (mediaAssetId: string) => {
+  const now = new Date()
+  const updateFields = {
+    status: "pending" as const,
+    peaks: null,
+    bucketCount: null,
+    lastError: null,
+    requestedAt: now,
+    startedAt: null,
+    completedAt: null,
+    updatedAt: now,
+  }
+
+  await upsertWaveformState({
+    mediaAssetId,
+    insert: { ...updateFields, createdAt: now },
+    update: updateFields,
+  })
 }
 
 export const saveWaveformEnqueueError = async ({
@@ -135,10 +139,9 @@ export const saveWaveformEnqueueError = async ({
 }) => {
   const now = new Date()
 
-  await db
-    .insert(mediaWaveforms)
-    .values({
-      mediaAssetId,
+  await upsertWaveformState({
+    mediaAssetId,
+    insert: {
       status: "pending",
       peaks: null,
       bucketCount: null,
@@ -148,46 +151,32 @@ export const saveWaveformEnqueueError = async ({
       completedAt: null,
       createdAt: now,
       updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: mediaWaveforms.mediaAssetId,
-      set: {
-        status: "pending",
-        lastError: error,
-        updatedAt: now,
-      },
-    })
+    },
+    update: {
+      status: "pending",
+      lastError: error,
+      updatedAt: now,
+    },
+  })
 }
 
 export const markWaveformProcessing = async (mediaAssetId: string) => {
   const now = new Date()
+  const updateFields = {
+    status: "processing" as const,
+    peaks: null,
+    bucketCount: null,
+    lastError: null,
+    startedAt: now,
+    completedAt: null,
+    updatedAt: now,
+  }
 
-  await db
-    .insert(mediaWaveforms)
-    .values({
-      mediaAssetId,
-      status: "processing",
-      peaks: null,
-      bucketCount: null,
-      lastError: null,
-      requestedAt: now,
-      startedAt: now,
-      completedAt: null,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: mediaWaveforms.mediaAssetId,
-      set: {
-        status: "processing",
-        peaks: null,
-        bucketCount: null,
-        lastError: null,
-        startedAt: now,
-        completedAt: null,
-        updatedAt: now,
-      },
-    })
+  await upsertWaveformState({
+    mediaAssetId,
+    insert: { ...updateFields, requestedAt: now, createdAt: now },
+    update: updateFields,
+  })
 }
 
 export const saveWaveformResult = async ({
@@ -200,32 +189,20 @@ export const saveWaveformResult = async ({
   bucketCount: number
 }) => {
   const now = new Date()
+  const updateFields = {
+    status: "ready" as const,
+    peaks,
+    bucketCount,
+    lastError: null,
+    completedAt: now,
+    updatedAt: now,
+  }
 
-  await db
-    .insert(mediaWaveforms)
-    .values({
-      mediaAssetId,
-      status: "ready",
-      peaks,
-      bucketCount,
-      lastError: null,
-      requestedAt: now,
-      startedAt: now,
-      completedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: mediaWaveforms.mediaAssetId,
-      set: {
-        status: "ready",
-        peaks,
-        bucketCount,
-        lastError: null,
-        completedAt: now,
-        updatedAt: now,
-      },
-    })
+  await upsertWaveformState({
+    mediaAssetId,
+    insert: { ...updateFields, requestedAt: now, startedAt: now, createdAt: now },
+    update: updateFields,
+  })
 }
 
 export const failWaveform = async ({
@@ -236,32 +213,20 @@ export const failWaveform = async ({
   error: string
 }) => {
   const now = new Date()
+  const updateFields = {
+    status: "failed" as const,
+    peaks: null,
+    bucketCount: null,
+    lastError: error,
+    completedAt: now,
+    updatedAt: now,
+  }
 
-  await db
-    .insert(mediaWaveforms)
-    .values({
-      mediaAssetId,
-      status: "failed",
-      peaks: null,
-      bucketCount: null,
-      lastError: error,
-      requestedAt: now,
-      startedAt: now,
-      completedAt: now,
-      createdAt: now,
-      updatedAt: now,
-    })
-    .onConflictDoUpdate({
-      target: mediaWaveforms.mediaAssetId,
-      set: {
-        status: "failed",
-        peaks: null,
-        bucketCount: null,
-        lastError: error,
-        completedAt: now,
-        updatedAt: now,
-      },
-    })
+  await upsertWaveformState({
+    mediaAssetId,
+    insert: { ...updateFields, requestedAt: now, startedAt: now, createdAt: now },
+    update: updateFields,
+  })
 }
 
 export const applyWaveformStateUpdate = async (

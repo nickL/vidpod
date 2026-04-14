@@ -1,8 +1,10 @@
 "use client"
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { AnimatePresence, motion } from "motion/react"
 
 import { Spacer } from "@/components/ui/spacer"
+import { formatTimecode } from "@/lib/utils"
 
 import type { Marker, MarkerActivation, MediaWaveform } from "../types"
 
@@ -33,6 +35,30 @@ const VIEWPORT_SEEK_THRESHOLD_PX = 3
 const VIEWPORT_FOLLOW_PADDING_PX = 24
 const ZOOM_EPSILON = 0.001
 
+const DRAG_PREVIEW_BADGE = {
+  growsFromMarkerWidthPx: 100,
+  stopsAtMarkerWidthPx: 240,
+  maxScale: 1.3,
+  baseFontSizePx: 12,
+  basePaddingXPx: 10,
+  basePaddingYPx: 6,
+} as const
+
+const getDragPreviewScale = (markerWidthPx: number) => {
+  const { growsFromMarkerWidthPx, stopsAtMarkerWidthPx, maxScale } =
+    DRAG_PREVIEW_BADGE
+  if (markerWidthPx <= growsFromMarkerWidthPx) {
+    return 1
+  }
+  if (markerWidthPx >= stopsAtMarkerWidthPx) {
+    return maxScale
+  }
+  const progress =
+    (markerWidthPx - growsFromMarkerWidthPx) /
+    (stopsAtMarkerWidthPx - growsFromMarkerWidthPx)
+  return 1 + progress * (maxScale - 1)
+}
+
 type ViewportSeekState = {
   pointerId: number
   startClientX: number
@@ -59,11 +85,16 @@ type TimelineProps = {
   displayTimeMs: number
   durationMs: number
   waveform?: MediaWaveform
+  isPlaying: boolean
   markerActivation?: MarkerActivation
   selectedMarkerId?: string
+  canUndo: boolean
+  canRedo: boolean
   onMarkerTimeCommit: (markerId: string, requestedTimeMs: number) => void
   onActivateMarker: (markerId: string, requestedTimeMs: number) => void
   onSelectMarker: (markerId: string) => void
+  onUndo: () => void | Promise<void>
+  onRedo: () => void | Promise<void>
   onScrubChange: (timeMs: number) => void
   onScrubEnd: () => void
   onScrubStart: () => void
@@ -74,11 +105,16 @@ export const Timeline = ({
   displayTimeMs,
   durationMs,
   waveform,
+  isPlaying,
   markerActivation,
   selectedMarkerId,
+  canUndo,
+  canRedo,
   onMarkerTimeCommit,
   onActivateMarker,
   onSelectMarker,
+  onUndo,
+  onRedo,
   onScrubChange,
   onScrubEnd,
   onScrubStart,
@@ -630,12 +666,16 @@ export const Timeline = ({
   }, [contentWidthPx, markerActivation, timelineDurationMs])
 
   return (
-    <section className="col-span-2 flex flex-col rounded-2xl border border-zinc-200 bg-white p-8">
+    <section className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-8 min-[1400px]:col-span-2">
       <Toolbar
         currentTimeMs={displayTimeMs}
         zoomPercent={zoomPercent}
         canZoomIn={canZoomIn}
         canZoomOut={canZoomOut}
+        canUndo={canUndo}
+        canRedo={canRedo}
+        onUndo={onUndo}
+        onRedo={onRedo}
         onZoomChange={handleZoomSliderChange}
         onZoomIn={() => zoomToPercent(zoomPercent + ZOOM_BUTTON_STEP)}
         onZoomOut={() => zoomToPercent(zoomPercent - ZOOM_BUTTON_STEP)}
@@ -650,6 +690,9 @@ export const Timeline = ({
           waveform={waveform}
           selectedMarkerId={selectedMarkerId}
           draggingMarkerId={markerDragState?.markerId}
+          dragPreviewTimeMs={
+            markerDragState ? draftRequestedTimeMs : undefined
+          }
           rulerScale={rulerScale}
           onMarkerDragStart={handleMarkerDragStart}
           onPointerCancel={handleViewportPointerCancel}
@@ -665,6 +708,7 @@ export const Timeline = ({
           scrollLeftPx={scrollLeftPx}
           timelineDurationMs={timelineDurationMs}
           isDragging={isDraggingPlayhead}
+          isPlaying={isPlaying}
           onDragCancel={handlePlayheadPointerCancel}
           onDragStart={handlePlayheadPointerDown}
           onDragMove={handlePlayheadPointerMove}
@@ -788,6 +832,7 @@ type TimelineViewportProps = {
   waveform?: MediaWaveform
   selectedMarkerId?: string
   draggingMarkerId?: string
+  dragPreviewTimeMs?: number
   rulerScale: RulerScale
   onMarkerDragStart: (
     event: React.PointerEvent<HTMLDivElement>,
@@ -808,6 +853,7 @@ const TimelineViewport = ({
   waveform,
   selectedMarkerId,
   draggingMarkerId,
+  dragPreviewTimeMs,
   rulerScale,
   onMarkerDragStart,
   onPointerCancel,
@@ -816,6 +862,20 @@ const TimelineViewport = ({
   onPointerUp,
   onScroll,
 }: TimelineViewportProps) => {
+  const dragPreviewLeftPx =
+    dragPreviewTimeMs !== undefined && contentWidthPx > 0
+      ? timeToPx(
+          dragPreviewTimeMs + MARKER_DURATION_MS / 2,
+          timelineDurationMs,
+          contentWidthPx
+        )
+      : undefined
+  const markerWidthPx =
+    contentWidthPx > 0
+      ? (MARKER_DURATION_MS / timelineDurationMs) * contentWidthPx
+      : 0
+  const dragPreviewScale = getDragPreviewScale(markerWidthPx)
+
   return (
     <div
       ref={viewportRef}
@@ -848,6 +908,30 @@ const TimelineViewport = ({
           markers={markers}
           rulerScale={rulerScale}
         />
+        <AnimatePresence>
+          {dragPreviewLeftPx !== undefined && dragPreviewTimeMs !== undefined ? (
+            <motion.div
+              key="drag-time-preview"
+              initial={{ opacity: 0, y: 4, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 4, scale: 0.96 }}
+              transition={{ duration: 0.12, ease: "easeOut" }}
+              className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md bg-zinc-900 font-semibold text-white shadow-lg ring-1 ring-zinc-950/20"
+              style={{
+                left: dragPreviewLeftPx,
+                top: HANDLE_ZONE_HEIGHT + 4,
+                fontSize: DRAG_PREVIEW_BADGE.baseFontSizePx * dragPreviewScale,
+                paddingInline:
+                  DRAG_PREVIEW_BADGE.basePaddingXPx * dragPreviewScale,
+                paddingBlock:
+                  DRAG_PREVIEW_BADGE.basePaddingYPx * dragPreviewScale,
+                fontVariantNumeric: "tabular-nums",
+              }}
+            >
+              {formatTimecode(dragPreviewTimeMs)}
+            </motion.div>
+          ) : null}
+        </AnimatePresence>
       </div>
     </div>
   )
@@ -950,6 +1034,7 @@ type PlayheadOverlayProps = {
   scrollLeftPx: number
   timelineDurationMs: number
   isDragging: boolean
+  isPlaying: boolean
   onDragStart: (event: React.PointerEvent<HTMLDivElement>) => void
   onDragMove: (event: React.PointerEvent<HTMLDivElement>) => void
   onDragEnd: (event: React.PointerEvent<HTMLDivElement>) => void
@@ -962,6 +1047,7 @@ const PlayheadOverlay = ({
   scrollLeftPx,
   timelineDurationMs,
   isDragging,
+  isPlaying,
   onDragStart,
   onDragMove,
   onDragEnd,
@@ -995,6 +1081,7 @@ const PlayheadOverlay = ({
           trackTopOffset={HANDLE_ZONE_HEIGHT}
           trackHeight={TRACK_HEIGHT}
           isDragging={isDragging}
+          isPlaying={isPlaying}
           onDragCancel={onDragCancel}
           onDragStart={onDragStart}
           onDragMove={onDragMove}

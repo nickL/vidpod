@@ -4,12 +4,12 @@ import {
   createMarker,
   deleteMarker,
   updateMarker,
-} from "./marker-mutations"
+} from "./markers/marker-mutations"
 import {
   recordPlaybackEvent,
   startPlaybackSession,
-} from "./playback-sessions"
-import { generateMp4Export } from "./mp4-export"
+} from "./playback/playback-sessions"
+import { generateMp4Export } from "./mp4-export/mp4-export"
 import {
   failUpload,
   resetDemoEpisode,
@@ -17,13 +17,13 @@ import {
   refreshUploadedAsset,
   setCurrentEpisodeVideo,
   startUpload,
-} from "./uploads"
+} from "./uploads/uploads"
 
 import type {
   CreateMarkerInput,
   UpdateMarkerInput,
-} from "./marker-mutations"
-import type { StartPlaybackSessionInput } from "./playback-sessions"
+} from "./markers/marker-mutations"
+import type { StartPlaybackSessionInput } from "./playback/playback-sessions"
 import type { EpisodeVideoAsset, PlaybackEventInput } from "./types"
 import type { UploadInitInput, UploadTarget } from "./types"
 
