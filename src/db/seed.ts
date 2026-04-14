@@ -173,7 +173,6 @@ const episode: EpisodeInsert = {
   publishedAt: new Date("2024-04-12"),
   mainMediaAssetId: episodeMediaAssetId,
   durationMs: episodeMediaFixture.durationMs,
-  editorConfigVersion: 1,
 }
 
 const seedMediaAssets: MediaAssetInsert[] = [
@@ -333,7 +332,6 @@ export const seedDatabase = async () => {
         publishedAt: episode.publishedAt,
         mainMediaAssetId: episode.mainMediaAssetId,
         durationMs: episode.durationMs,
-        editorConfigVersion: episode.editorConfigVersion,
         archivedAt: null,
         updatedAt: now,
       },

@@ -18,6 +18,7 @@ type PlayerPanelProps = {
   onDurationChange: () => void
   onLoadedMetadata: () => void
   onPlaybackError: () => void
+  onVideoEnded: () => void
   onTimeUpdate: () => void
   onTogglePlayback: () => void | Promise<void>
 }
@@ -35,6 +36,7 @@ export const PlayerPanel = ({
   onDurationChange,
   onLoadedMetadata,
   onPlaybackError,
+  onVideoEnded,
   onTimeUpdate,
   onTogglePlayback,
 }: PlayerPanelProps) => {
@@ -63,6 +65,7 @@ export const PlayerPanel = ({
             playsInline
             preload="metadata"
             onDurationChange={onDurationChange}
+            onEnded={onVideoEnded}
             onError={onPlaybackError}
             onLoadedMetadata={onLoadedMetadata}
             onPause={() => setIsPlaying(false)}

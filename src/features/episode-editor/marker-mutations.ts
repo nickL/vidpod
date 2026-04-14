@@ -4,9 +4,11 @@ import { and, eq, inArray, ne } from "drizzle-orm"
 import type { BatchItem } from "drizzle-orm/batch"
 
 import { db } from "@/db"
-import { adAssets, adBreaks, adBreakVariants, episodes } from "@/db/schema"
+import { adAssets, adBreaks, adBreakVariants, episodes, mediaAssets } from "@/db/schema"
 
 import type { Marker, MarkerVariant } from "./types"
+import { invalidatePlaybackSessions } from "./playback-sessions"
+import { getMarkerPlaybackReadiness } from "./playback-runtime"
 import { MARKER_DURATION_MS } from "./timeline/shared"
 
 type MarkerSelectionMode = Marker["selectionMode"]
@@ -22,7 +24,8 @@ type VariantInput = {
 
 type EpisodeContext = {
   showId: string
-  durationMs: number | null
+  durationMs?: number
+  mainMediaDurationMs?: number
 }
 
 export type CreateMarkerInput = {
@@ -95,8 +98,10 @@ const getEpisodeContext = async (episodeId: string) => {
     .select({
       showId: episodes.showId,
       durationMs: episodes.durationMs,
+      mainMediaDurationMs: mediaAssets.durationMs,
     })
     .from(episodes)
+    .leftJoin(mediaAssets, eq(episodes.mainMediaAssetId, mediaAssets.id))
     .where(eq(episodes.id, episodeId))
     .limit(1)
 
@@ -104,7 +109,11 @@ const getEpisodeContext = async (episodeId: string) => {
     throw new Error(`Episode not found: ${episodeId}`)
   }
 
-  return episode
+  return {
+    showId: episode.showId,
+    durationMs: episode.durationMs ?? undefined,
+    mainMediaDurationMs: episode.mainMediaDurationMs ?? undefined,
+  }
 }
 
 const runBatchQueries = async (queries: BatchItem<"pg">[]) => {
@@ -139,7 +148,7 @@ const validateMarkerPlacement = async ({
   markerIdToIgnore,
 }: {
   episodeId: string
-  episodeDurationMs?: number | null
+  episodeDurationMs?: number
   requestedTimeMs: number
   markerIdToIgnore?: string
 }) => {
@@ -186,6 +195,7 @@ const validateMarkerPlacement = async ({
 const loadPersistedMarker = async (markerId: string): Promise<Marker> => {
   const [markerRow] = await db
     .select({
+      episodeId: adBreaks.episodeId,
       id: adBreaks.id,
       requestedTimeMs: adBreaks.requestedTimeMs,
       selectionMode: adBreaks.selectionMode,
@@ -205,6 +215,7 @@ const loadPersistedMarker = async (markerId: string): Promise<Marker> => {
       id: adBreakVariants.id,
       adAssetId: adBreakVariants.adAssetId,
       adAssetTitle: adAssets.title,
+      mediaStatus: mediaAssets.status,
       ordinal: adBreakVariants.ordinal,
       status: adBreakVariants.status,
       weight: adBreakVariants.weight,
@@ -212,8 +223,22 @@ const loadPersistedMarker = async (markerId: string): Promise<Marker> => {
     })
     .from(adBreakVariants)
     .innerJoin(adAssets, eq(adBreakVariants.adAssetId, adAssets.id))
+    .innerJoin(mediaAssets, eq(adAssets.mediaAssetId, mediaAssets.id))
     .where(eq(adBreakVariants.adBreakId, markerId))
     .orderBy(adBreakVariants.ordinal)
+
+  const episodeContext = await getEpisodeContext(markerRow.episodeId)
+  const episodeDurationMs =
+    episodeContext.durationMs ?? episodeContext.mainMediaDurationMs ?? undefined
+  const variants = variantRows.map((row) => ({
+    id: row.id,
+    adAssetId: row.adAssetId,
+    adAssetTitle: row.adAssetTitle,
+    ordinal: row.ordinal,
+    status: row.status,
+    weight: row.weight ?? undefined,
+    isControl: row.isControl ?? undefined,
+  }))
 
   return {
     id: markerRow.id,
@@ -221,15 +246,23 @@ const loadPersistedMarker = async (markerId: string): Promise<Marker> => {
     selectionMode: markerRow.selectionMode,
     status: markerRow.status,
     label: markerRow.label ?? undefined,
-    variants: variantRows.map((row) => ({
-      id: row.id,
-      adAssetId: row.adAssetId,
-      adAssetTitle: row.adAssetTitle,
-      ordinal: row.ordinal,
-      status: row.status,
-      weight: row.weight ?? undefined,
-      isControl: row.isControl ?? undefined,
-    })),
+    variants,
+    playbackReadiness: getMarkerPlaybackReadiness({
+      episodeDurationMs,
+      marker: {
+        id: markerRow.id,
+        requestedTimeMs: markerRow.requestedTimeMs,
+        selectionMode: markerRow.selectionMode,
+        status: markerRow.status,
+        variants: variantRows.map((row) => ({
+          id: row.id,
+          status: row.status,
+          weight: row.weight ?? undefined,
+          isControl: row.isControl ?? undefined,
+          mediaStatus: row.mediaStatus,
+        })),
+      },
+    }),
   }
 }
 
@@ -243,7 +276,8 @@ export const createMarker = async (
 
   await validateMarkerPlacement({
     episodeId: input.episodeId,
-    episodeDurationMs: episodeContext.durationMs,
+    episodeDurationMs:
+      episodeContext.durationMs ?? episodeContext.mainMediaDurationMs ?? undefined,
     requestedTimeMs: input.requestedTimeMs,
   })
   validateVariantsForSelectionMode(selectionMode, variants)
@@ -267,6 +301,7 @@ export const createMarker = async (
   }
 
   await runBatchQueries(createQueries)
+  await invalidatePlaybackSessions(input.episodeId)
 
   return loadPersistedMarker(markerId)
 }
@@ -301,7 +336,8 @@ export const updateMarker = async (
 
   await validateMarkerPlacement({
     episodeId: currentMarker.episodeId,
-    episodeDurationMs: episodeContext.durationMs,
+    episodeDurationMs:
+      episodeContext.durationMs ?? episodeContext.mainMediaDurationMs ?? undefined,
     requestedTimeMs,
     markerIdToIgnore: input.markerId,
   })
@@ -337,11 +373,25 @@ export const updateMarker = async (
   }
 
   await runBatchQueries(updateQueries)
+  await invalidatePlaybackSessions(currentMarker.episodeId)
 
   return loadPersistedMarker(input.markerId)
 }
 
 export const deleteMarker = async (markerId: string) => {
+  const [currentMarker] = await db
+    .select({
+      id: adBreaks.id,
+      episodeId: adBreaks.episodeId,
+    })
+    .from(adBreaks)
+    .where(eq(adBreaks.id, markerId))
+    .limit(1)
+
+  if (!currentMarker) {
+    throw new Error(`Marker not found: ${markerId}`)
+  }
+
   const [deletedMarker] = await db
     .delete(adBreaks)
     .where(eq(adBreaks.id, markerId))
@@ -352,6 +402,8 @@ export const deleteMarker = async (markerId: string) => {
   if (!deletedMarker) {
     throw new Error(`Marker not found: ${markerId}`)
   }
+
+  await invalidatePlaybackSessions(currentMarker.episodeId)
 
   return deletedMarker
 }

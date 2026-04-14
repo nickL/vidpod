@@ -169,6 +169,11 @@ export const EpisodeEditor = ({
     )
   }, [data?.markers, pendingMarkerTimes])
 
+  const previewConfigKey = useMemo(
+    () => getPreviewConfigKey(data?.markers ?? []),
+    [data?.markers]
+  )
+
   if (!data) {
     return null
   }
@@ -207,10 +212,12 @@ export const EpisodeEditor = ({
         />
         <PlaybackSection
           key={data.mainMediaAsset?.id ?? "missing-main-media"}
+          episodeId={episodeId}
           title={data.episode.title}
           episodeDurationMs={data.episode.durationMs}
           mainMediaAsset={data.mainMediaAsset}
           markers={displayedMarkers}
+          previewConfigKey={previewConfigKey}
           markerActivation={markerActivation}
           selectedMarkerId={selectedMarkerId}
           onMarkerTimeCommit={queueMarkerSave}
@@ -233,4 +240,28 @@ const sortMarkers = (markers: Marker[]) => {
     (leftMarker, rightMarker) =>
       leftMarker.requestedTimeMs - rightMarker.requestedTimeMs
   )
+}
+
+const getPreviewConfigKey = (markers: Marker[]) => {
+  return markers
+    .map((marker) =>
+      [
+        marker.id,
+        marker.requestedTimeMs,
+        marker.selectionMode,
+        marker.status,
+        marker.variants
+          .map((variant) =>
+            [
+              variant.id,
+              variant.adAssetId,
+              variant.status,
+              variant.weight ?? "",
+              variant.isControl ? "control" : "",
+            ].join(":")
+          )
+          .join("|"),
+      ].join(":")
+    )
+    .join("~")
 }

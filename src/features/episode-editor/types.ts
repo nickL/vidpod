@@ -8,7 +8,6 @@ export type Show = {
 export type Episode = {
   id: string
   title: string
-  editorConfigVersion: number
   displayEpisodeNumber?: string
   publishedAt?: string
   durationMs?: number
@@ -46,6 +45,21 @@ export type MarkerVariant = {
   isControl?: boolean
 }
 
+export type MarkerPlaybackReasonCode =
+  | "needs_variant"
+  | "needs_more_variants_for_ab"
+  | "asset_unavailable"
+  | "invalid_break_time"
+  | "invalid_static_variant_count"
+
+export type MarkerPlaybackReasonSeverity = "guidance" | "warning"
+
+export type MarkerPlaybackReadiness = {
+  canPlay: boolean
+  reasonCode?: MarkerPlaybackReasonCode
+  reasonSeverity?: MarkerPlaybackReasonSeverity
+}
+
 export type Marker = {
   id: string
   requestedTimeMs: number
@@ -53,11 +67,43 @@ export type Marker = {
   status: "draft" | "active"
   label?: string
   variants: MarkerVariant[]
+  playbackReadiness: MarkerPlaybackReadiness
 }
 
 export type MarkerActivation = {
   markerId: string
   requestedTimeMs: number
+}
+
+export type PlaybackSession = {
+  id: string
+  status: "active" | "ended"
+  startedAt: string
+}
+
+export type ResolvedPlaybackBreak = {
+  adBreakId: string
+  requestedTimeMs: number
+  selectedVariant: {
+    id: string
+    adAssetId: string
+    adAssetTitle: string
+    mediaAsset: MediaAsset
+  }
+}
+
+export type PlaybackSessionStart = {
+  session: PlaybackSession
+  resolvedBreaks: ResolvedPlaybackBreak[]
+}
+
+export type PlaybackEventInput = {
+  playbackSessionId: string
+  adBreakId: string
+  selectedVariantId: string
+  eventType: "ad_started" | "ad_completed" | "ad_failed"
+  playheadTimeMs?: number
+  metadataJson?: Record<string, unknown>
 }
 
 export type EditorData = {

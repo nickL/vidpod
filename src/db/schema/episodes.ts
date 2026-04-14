@@ -17,7 +17,6 @@ export const episodes = pgTable(
       onDelete: "restrict",
     }),
     durationMs: integer("duration_ms"),
-    editorConfigVersion: integer("editor_config_version").notNull().default(1),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),

@@ -13,6 +13,8 @@ import {
 } from "@/db/schema"
 import { serverEnv } from "@/env/server"
 
+import { getMarkerPlaybackReadiness } from "./playback-runtime"
+
 import type { EditorData } from "./types"
 
 const toIsoString = (value: Date | null) => {
@@ -31,6 +33,28 @@ const buildStreamPlaybackUrl = (streamVideoId: string) => {
     .replace(/\/$/, "")
 
   return `https://${hostname}/${streamVideoId}/manifest/video.m3u8`
+}
+
+const toEditorMarkerVariants = (
+  variants: Array<{
+    id: string
+    adAssetId: string
+    adAssetTitle: string
+    ordinal: number
+    status: "active" | "paused"
+    weight: number | null
+    isControl: boolean | null
+  }>
+) => {
+  return variants.map((variant) => ({
+    id: variant.id,
+    adAssetId: variant.adAssetId,
+    adAssetTitle: variant.adAssetTitle,
+    ordinal: variant.ordinal,
+    status: variant.status,
+    weight: variant.weight ?? undefined,
+    isControl: variant.isControl ?? undefined,
+  }))
 }
 
 export const getDefaultEpisodeId = async () => {
@@ -59,7 +83,6 @@ export const getEpisodeEditor = async (
       displayEpisodeNumber: episodes.displayEpisodeNumber,
       publishedAt: episodes.publishedAt,
       episodeDurationMs: episodes.durationMs,
-      editorConfigVersion: episodes.editorConfigVersion,
       mainMediaAssetId: mediaAssets.id,
       mainMediaStreamVideoId: mediaAssets.streamVideoId,
       mainMediaStatus: mediaAssets.status,
@@ -105,6 +128,7 @@ export const getEpisodeEditor = async (
             adBreakId: adBreakVariants.adBreakId,
             adAssetId: adBreakVariants.adAssetId,
             adAssetTitle: adAssets.title,
+            mediaStatus: mediaAssets.status,
             ordinal: adBreakVariants.ordinal,
             weight: adBreakVariants.weight,
             isControl: adBreakVariants.isControl,
@@ -112,6 +136,7 @@ export const getEpisodeEditor = async (
           })
           .from(adBreakVariants)
           .innerJoin(adAssets, eq(adBreakVariants.adAssetId, adAssets.id))
+          .innerJoin(mediaAssets, eq(adAssets.mediaAssetId, mediaAssets.id))
           .where(inArray(adBreakVariants.adBreakId, markerIds))
           .orderBy(asc(adBreakVariants.ordinal))
 
@@ -139,6 +164,9 @@ export const getEpisodeEditor = async (
     .where(eq(adAssets.showId, episode.showId))
     .orderBy(asc(adAssets.createdAt))
 
+  const episodeDurationMs =
+    episode.episodeDurationMs ?? episode.mainMediaDurationMs ?? undefined
+
   return {
     show: {
       id: episode.showId,
@@ -147,27 +175,40 @@ export const getEpisodeEditor = async (
     episode: {
       id: episode.episodeId,
       title: episode.episodeTitle,
-      editorConfigVersion: episode.editorConfigVersion,
       displayEpisodeNumber: episode.displayEpisodeNumber ?? undefined,
       publishedAt: toIsoString(episode.publishedAt),
       durationMs: episode.episodeDurationMs ?? undefined,
     },
-    markers: markerRows.map((row) => ({
-      id: row.id,
-      requestedTimeMs: row.requestedTimeMs,
-      selectionMode: row.selectionMode,
-      status: row.status,
-      label: row.label ?? undefined,
-      variants: (markerVariantsByBreakId.get(row.id) ?? []).map((variant) => ({
-        id: variant.id,
-        adAssetId: variant.adAssetId,
-        adAssetTitle: variant.adAssetTitle,
-        ordinal: variant.ordinal,
-        status: variant.status,
-        weight: variant.weight ?? undefined,
-        isControl: variant.isControl ?? undefined,
-      })),
-    })),
+    markers: markerRows.map((row) => {
+      const markerVariants = markerVariantsByBreakId.get(row.id) ?? []
+      const variants = toEditorMarkerVariants(markerVariants)
+      const playbackReadiness = getMarkerPlaybackReadiness({
+        episodeDurationMs,
+        marker: {
+          id: row.id,
+          requestedTimeMs: row.requestedTimeMs,
+          selectionMode: row.selectionMode,
+          status: row.status,
+          variants: markerVariants.map((variant) => ({
+            id: variant.id,
+            status: variant.status,
+            weight: variant.weight ?? undefined,
+            isControl: variant.isControl ?? undefined,
+            mediaStatus: variant.mediaStatus,
+          })),
+        },
+      })
+
+      return {
+        id: row.id,
+        requestedTimeMs: row.requestedTimeMs,
+        selectionMode: row.selectionMode,
+        status: row.status,
+        label: row.label ?? undefined,
+        variants,
+        playbackReadiness,
+      }
+    }),
     mainMediaAsset: episode.mainMediaAssetId
       ? {
           id: episode.mainMediaAssetId,

@@ -23,3 +23,20 @@ export const adBreakVariantStatusEnum = pgEnum("ad_break_variant_status", [
   "active",
   "paused",
 ])
+
+export const playbackSessionModeEnum = pgEnum("playback_session_mode", [
+  "editor_preview",
+])
+
+export const playbackSessionStatusEnum = pgEnum("playback_session_status", [
+  "active",
+  "ended",
+])
+
+export const playbackEventTypeEnum = pgEnum("playback_event_type", [
+  "session_started",
+  "break_resolved",
+  "ad_started",
+  "ad_completed",
+  "ad_failed",
+])
