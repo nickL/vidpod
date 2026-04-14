@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
+import { AppShell } from "@/components/layout/app-shell"
 import { Providers } from "./providers"
 
 import "./globals.css"
@@ -17,7 +18,11 @@ export const metadata: Metadata = {
 const RootLayout = ({ children }: { children: React.ReactNode }) => {
   return (
     <html lang="en" className={inter.variable}>
-      <body><Providers>{children}</Providers></body>
+      <body>
+        <Providers>
+          <AppShell>{children}</AppShell>
+        </Providers>
+      </body>
     </html>
   )
 }

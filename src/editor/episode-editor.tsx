@@ -24,7 +24,7 @@ import {
 import { MarkerPanel } from "./marker-panel"
 import { PlaybackSection } from "./playback-section"
 import { episodeEditorQueryKey } from "./query-options"
-import { useEpisodeEditor } from "./use-episode-editor"
+import { useEditorData } from "./use-editor-data"
 import { MARKER_DURATION_MS } from "./timeline/shared"
 
 import type {
@@ -83,7 +83,7 @@ export const EpisodeEditor = ({
   hlsBaseUrl,
 }: EpisodeEditorProps) => {
   const queryClient = useQueryClient()
-  const { data } = useEpisodeEditor(episodeId)
+  const { data } = useEditorData(episodeId)
   const activeMarkerSaveIdsRef = useRef<Record<string, number>>({})
   const queuedMarkerSavesRef = useRef<Record<string, QueuedMarkerSave | undefined>>(
     {}

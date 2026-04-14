@@ -4,7 +4,7 @@ import { serverEnv } from "@/env/server"
 import {
   applyWaveformStateUpdate,
   type WaveformStateUpdate,
-} from "@/features/episode-editor/waveform-jobs"
+} from "@/editor/waveform-jobs"
 
 export const dynamic = "force-dynamic"
 

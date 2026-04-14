@@ -1,13 +1,13 @@
 import { dehydrate, HydrationBoundary } from "@tanstack/react-query"
 
-import { EpisodeEditor } from "@/features/episode-editor/episode-editor"
-import { episodeEditorQueryKey } from "@/features/episode-editor/query-options"
+import { EpisodeEditor } from "@/editor/episode-editor"
+import { episodeEditorQueryKey } from "@/editor/query-options"
 import {
   getDefaultEpisodeId,
   getEpisodeEditor,
-} from "@/features/episode-editor/server"
+} from "@/editor/editor-data"
 import { serverEnv } from "@/env/server"
-import { getQueryClient } from "@/lib/react-query/get-query-client"
+import { getQueryClient } from "@/lib/query-client"
 
 export const dynamic = "force-dynamic"
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-import { getEpisodeEditor } from "@/features/episode-editor/server"
+import { getEpisodeEditor } from "@/editor/editor-data"
 
 export const dynamic = "force-dynamic"
 
