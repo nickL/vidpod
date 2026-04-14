@@ -10,6 +10,16 @@ const defaultDateFormat: Intl.DateTimeFormatOptions  = {
 
 export const cn = (...inputs: ClassValue[]) =>  twMerge(clsx(inputs));
 
+export const capitalize = (value: string) => {
+  const text = value.trim()
+
+  if (!text) {
+    return ""
+  }
+
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 export const formatTimecode = (ms: number) => {
   const totalSeconds = Math.floor(ms / 1000)
   const hours = Math.floor(totalSeconds / 3600)

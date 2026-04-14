@@ -31,6 +31,7 @@ type SeedAdMediaFixture = {
   title: string
   durationMs: number
   streamVideoId: string
+  thumbnailTimeSec: number
 }
 
 const createSeedId = (key: string) => {
@@ -79,8 +80,18 @@ const getSeedAdAssetId = (key: string) => createSeedId(`ad:${key}`)
 const streamCustomerHostname = "customer-gr52eybf6m0pbuz7.cloudflarestream.com"
 const buildStreamPlaybackUrl = (streamVideoId: string) =>
   `https://${streamCustomerHostname}/${streamVideoId}/manifest/video.m3u8`
-const buildStreamThumbnailUrl = (streamVideoId: string) =>
-  `https://${streamCustomerHostname}/${streamVideoId}/thumbnails/thumbnail.jpg`
+const buildStreamThumbnailUrl = (
+  streamVideoId: string,
+  thumbnailTimeSec?: number
+) => {
+  const baseUrl = `https://${streamCustomerHostname}/${streamVideoId}/thumbnails/thumbnail.jpg`
+
+  if (thumbnailTimeSec === undefined) {
+    return baseUrl
+  }
+
+  return `${baseUrl}?time=${thumbnailTimeSec}s&height=270`
+}
 const staticBreakId = createSeedId("break:2")
 const abBreakId = createSeedId("break:3")
 
@@ -92,10 +103,10 @@ const episodeMediaFixtures = {
       "https://customer-gr52eybf6m0pbuz7.cloudflarestream.com/1f74806904cd292f47665eac3cb2c9a9/manifest/video.m3u8",
   },
   long: {
-    durationMs: 780_167,
-    streamVideoId: "98c7122f3165a1c0f564f9f6aa29e01f",
+    durationMs: 299_900,
+    streamVideoId: "f640b41763b33156d478dd5906a2d8bc",
     playbackUrl:
-      "https://customer-gr52eybf6m0pbuz7.cloudflarestream.com/98c7122f3165a1c0f564f9f6aa29e01f/manifest/video.m3u8",
+      "https://customer-gr52eybf6m0pbuz7.cloudflarestream.com/f640b41763b33156d478dd5906a2d8bc/manifest/video.m3u8",
   },
 } satisfies Record<string, EpisodeMediaFixture>
 
@@ -108,54 +119,63 @@ const seedAdMediaFixtures = [
     title: "Example Ad 01 (90s)",
     durationMs: 60_200,
     streamVideoId: "2fd6f89938c1a986fb391f679410d45d",
+    thumbnailTimeSec: 8,
   },
   {
     key: "example-ad-02-90s",
     title: "Example Ad 02 (90s)",
     durationMs: 30_000,
     streamVideoId: "a3128a53bbb0c5b7aa014e496e649e18",
+    thumbnailTimeSec: 8,
   },
   {
     key: "example-ad-03-90s",
     title: "Example Ad 03 (90s)",
     durationMs: 54_500,
     streamVideoId: "065a321eb2c44b1ef1dfc9a0a5c1781c",
+    thumbnailTimeSec: 10,
   },
   {
     key: "example-ad-04-90s",
     title: "Example Ad 04 (90s)",
     durationMs: 30_000,
     streamVideoId: "56d604f67bbeb15512ca9e5445274ec1",
+    thumbnailTimeSec: 6,
   },
   {
     key: "example-ad-05-90s",
     title: "Example Ad 05 (90s)",
     durationMs: 30_200,
     streamVideoId: "88ab00380bd7f92bd8b0fe5be7514536",
+    thumbnailTimeSec: 6,
   },
   {
     key: "example-ad-06-classic",
     title: "Example Ad 06 (Classic)",
     durationMs: 51_200,
     streamVideoId: "63a798000147bcdf1b942e1816da32ed",
+    thumbnailTimeSec: 8,
   },
   {
     key: "example-ad-07-classic",
     title: "Example Ad 07 (Classic)",
     durationMs: 89_000,
     streamVideoId: "2312e3c821464b3abc80e962d66e4c85",
+    thumbnailTimeSec: 12,
   },
   {
     key: "example-ad-08-classic",
     title: "Example Ad 08 (Classic)",
     durationMs: 60_500,
     streamVideoId: "40c6f31c3a592de0554f62878525763a",
+    thumbnailTimeSec: 8,
   },
   {
     key: "example-ad-09-classic",
     title: "Example Ad 09 (Classic)",
     durationMs: 60_000,
     streamVideoId: "338992f3b4a42bf72ccae4a463d6170d",
+    thumbnailTimeSec: 8,
   },
 ] satisfies SeedAdMediaFixture[]
 
@@ -167,8 +187,7 @@ const show: ShowInsert = {
 const episode: EpisodeInsert = {
   id: episodeId,
   showId,
-  title:
-    "The Longevity Expert: The Truth About Ozempic, The Magic Weight Loss Drug & The Link Between Milk & Cancer!",
+  title: "Artemis II & Vidpod: One Small Step, One Giant Edit",
   displayEpisodeNumber: "Episode 503",
   publishedAt: new Date("2024-04-12"),
   mainMediaAssetId: episodeMediaAssetId,
@@ -188,7 +207,10 @@ const seedMediaAssets: MediaAssetInsert[] = [
     createReadyMediaAsset(`media:${fixture.key}`, fixture.streamVideoId, {
       durationMs: fixture.durationMs,
       playbackUrl: buildStreamPlaybackUrl(fixture.streamVideoId),
-      thumbnailUrl: buildStreamThumbnailUrl(fixture.streamVideoId),
+      thumbnailUrl: buildStreamThumbnailUrl(
+        fixture.streamVideoId,
+        fixture.thumbnailTimeSec
+      ),
     })
   ),
 ]
@@ -212,14 +234,14 @@ const seedAdBreaks: AdBreakInsert[] = [
   {
     id: staticBreakId,
     episodeId,
-    requestedTimeMs: 320_000,
+    requestedTimeMs: 150_000,
     selectionMode: "static",
     status: "active",
   },
   {
     id: abBreakId,
     episodeId,
-    requestedTimeMs: 495_000,
+    requestedTimeMs: 240_000,
     selectionMode: "ab",
     status: "active",
   },
@@ -276,21 +298,25 @@ const seedAdBreakVariants: AdBreakVariantInsert[] = [
   },
 ]
 
-const legacySeedAdTitles = [
-  "Eight Sleep Q4 Pod 3 - v1",
-  "Eight Sleep Q4 Pod 3 - v2",
-  "Brilliant (maths & physics)",
-]
-const seedAdTitles = [...legacySeedAdTitles, ...seedAdLibrary.map((ad) => ad.title)]
+const seedAdTitles = seedAdLibrary.map((ad) => ad.title)
 
 export const seedDatabase = async () => {
-  const seedBreakIds = seedAdBreaks.map((b) => b.id!)
+  const existingBreakIds = (
+    await db
+      .select({ id: adBreaks.id })
+      .from(adBreaks)
+      .where(inArray(adBreaks.episodeId, [episodeId]))
+  ).map((row) => row.id)
 
   await db.delete(playbackSessions).where(inArray(playbackSessions.episodeId, [episodeId]))
-  await db
-    .delete(adBreakVariants)
-    .where(inArray(adBreakVariants.adBreakId, seedBreakIds))
-  await db.delete(adBreaks).where(inArray(adBreaks.id, seedBreakIds))
+
+  if (existingBreakIds.length > 0) {
+    await db
+      .delete(adBreakVariants)
+      .where(inArray(adBreakVariants.adBreakId, existingBreakIds))
+    await db.delete(adBreaks).where(inArray(adBreaks.id, existingBreakIds))
+  }
+
   await db.delete(adAssets).where(inArray(adAssets.title, seedAdTitles))
 
   await db

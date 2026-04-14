@@ -16,6 +16,7 @@ import {
 } from "./enums"
 import { adBreakVariants, adBreaks } from "./ad-breaks"
 import { episodes } from "./episodes"
+import { adAssets } from "./media"
 
 export const playbackSessions = pgTable(
   "playback_sessions",
@@ -47,9 +48,13 @@ export const playbackBreakResolutions = pgTable(
     adBreakId: uuid("ad_break_id")
       .notNull()
       .references(() => adBreaks.id, { onDelete: "cascade" }),
-    selectedVariantId: uuid("selected_variant_id")
+    selectedVariantId: uuid("selected_variant_id").references(
+      () => adBreakVariants.id,
+      { onDelete: "set null" }
+    ),
+    selectedAdAssetId: uuid("selected_ad_asset_id")
       .notNull()
-      .references(() => adBreakVariants.id, { onDelete: "restrict" }),
+      .references(() => adAssets.id, { onDelete: "restrict" }),
     selectionMode: adBreakSelectionModeEnum("selection_mode").notNull(),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }).defaultNow().notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
