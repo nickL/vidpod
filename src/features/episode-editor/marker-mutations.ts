@@ -77,8 +77,8 @@ const validateVariantsForSelectionMode = (
   selectionMode: MarkerSelectionMode,
   variants: VariantInput[]
 ) => {
-  if (selectionMode === "auto" && variants.length > 0) {
-    throw new Error("Auto markers cannot persist explicit ad variants")
+  if (selectionMode === "auto" && variants.length < 1) {
+    throw new Error("Auto markers require at least one ad variant")
   }
 
   if (selectionMode === "static" && variants.length !== 1) {

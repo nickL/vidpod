@@ -77,6 +77,20 @@ export const usePlayback = ({
   })
 
   useEffect(() => {
+    if (activePlaybackSource.kind !== "ad" || activePlaybackUrl) {
+      return
+    }
+
+    finishActiveAd({
+      eventType: "ad_failed",
+      metadataJson: {
+        reason: "playback_unavailable",
+      },
+      shouldPlay: shouldAutoplayRef.current,
+    })
+  }, [activePlaybackSource, activePlaybackUrl, finishActiveAd])
+
+  useEffect(() => {
     const video = videoRef.current
 
     if (!video || !videoElement || !playbackUrl || !supportsStreamPlayback) {

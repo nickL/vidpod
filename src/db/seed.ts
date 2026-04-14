@@ -10,6 +10,7 @@ import {
   adBreaks,
   episodes,
   mediaAssets,
+  playbackSessions,
   shows,
 } from "./schema"
 
@@ -23,6 +24,13 @@ type EpisodeMediaFixture = {
   durationMs: number
   streamVideoId: string
   playbackUrl: string
+}
+
+type SeedAdMediaFixture = {
+  key: string
+  title: string
+  durationMs: number
+  streamVideoId: string
 }
 
 const createSeedId = (key: string) => {
@@ -66,9 +74,13 @@ const seedNamespace = uuidv5("vidpod-seed", uuidv5.DNS)
 const showId = createSeedId("show")
 const episodeId = createSeedId("episode")
 const episodeMediaAssetId = createSeedId("media:episode")
-const eightSleepV1MediaAssetId = createSeedId("media:eight-sleep-v1")
-const eightSleepV2MediaAssetId = createSeedId("media:eight-sleep-v2")
-const brilliantMediaAssetId = createSeedId("media:brilliant-maths-physics")
+const getSeedMediaAssetId = (key: string) => createSeedId(`media:${key}`)
+const getSeedAdAssetId = (key: string) => createSeedId(`ad:${key}`)
+const streamCustomerHostname = "customer-gr52eybf6m0pbuz7.cloudflarestream.com"
+const buildStreamPlaybackUrl = (streamVideoId: string) =>
+  `https://${streamCustomerHostname}/${streamVideoId}/manifest/video.m3u8`
+const buildStreamThumbnailUrl = (streamVideoId: string) =>
+  `https://${streamCustomerHostname}/${streamVideoId}/thumbnails/thumbnail.jpg`
 const staticBreakId = createSeedId("break:2")
 const abBreakId = createSeedId("break:3")
 
@@ -88,8 +100,64 @@ const episodeMediaFixtures = {
 } satisfies Record<string, EpisodeMediaFixture>
 
 const episodeMediaFixture = episodeMediaFixtures.long
-const adDurationMs = 197_000
 const now = new Date()
+
+const seedAdMediaFixtures = [
+  {
+    key: "example-ad-01-90s",
+    title: "Example Ad 01 (90s)",
+    durationMs: 60_200,
+    streamVideoId: "2fd6f89938c1a986fb391f679410d45d",
+  },
+  {
+    key: "example-ad-02-90s",
+    title: "Example Ad 02 (90s)",
+    durationMs: 30_000,
+    streamVideoId: "a3128a53bbb0c5b7aa014e496e649e18",
+  },
+  {
+    key: "example-ad-03-90s",
+    title: "Example Ad 03 (90s)",
+    durationMs: 54_500,
+    streamVideoId: "065a321eb2c44b1ef1dfc9a0a5c1781c",
+  },
+  {
+    key: "example-ad-04-90s",
+    title: "Example Ad 04 (90s)",
+    durationMs: 30_000,
+    streamVideoId: "56d604f67bbeb15512ca9e5445274ec1",
+  },
+  {
+    key: "example-ad-05-90s",
+    title: "Example Ad 05 (90s)",
+    durationMs: 30_200,
+    streamVideoId: "88ab00380bd7f92bd8b0fe5be7514536",
+  },
+  {
+    key: "example-ad-06-classic",
+    title: "Example Ad 06 (Classic)",
+    durationMs: 51_200,
+    streamVideoId: "63a798000147bcdf1b942e1816da32ed",
+  },
+  {
+    key: "example-ad-07-classic",
+    title: "Example Ad 07 (Classic)",
+    durationMs: 89_000,
+    streamVideoId: "2312e3c821464b3abc80e962d66e4c85",
+  },
+  {
+    key: "example-ad-08-classic",
+    title: "Example Ad 08 (Classic)",
+    durationMs: 60_500,
+    streamVideoId: "40c6f31c3a592de0554f62878525763a",
+  },
+  {
+    key: "example-ad-09-classic",
+    title: "Example Ad 09 (Classic)",
+    durationMs: 60_000,
+    streamVideoId: "338992f3b4a42bf72ccae4a463d6170d",
+  },
+] satisfies SeedAdMediaFixture[]
 
 const show: ShowInsert = {
   id: showId,
@@ -117,47 +185,22 @@ const seedMediaAssets: MediaAssetInsert[] = [
       playbackUrl: episodeMediaFixture.playbackUrl,
     }
   ),
-  createReadyMediaAsset(
-    "media:eight-sleep-v1",
-    "seed-eight-sleep-q4-pod-3-v1",
-    {
-      durationMs: adDurationMs,
-    }
-  ),
-  createReadyMediaAsset(
-    "media:eight-sleep-v2",
-    "seed-eight-sleep-q4-pod-3-v2",
-    {
-      durationMs: adDurationMs,
-    }
-  ),
-  createReadyMediaAsset(
-    "media:brilliant-maths-physics",
-    "seed-brilliant-maths-and-physics",
-    {
-      durationMs: adDurationMs,
-    }
+  ...seedAdMediaFixtures.map((fixture) =>
+    createReadyMediaAsset(`media:${fixture.key}`, fixture.streamVideoId, {
+      durationMs: fixture.durationMs,
+      playbackUrl: buildStreamPlaybackUrl(fixture.streamVideoId),
+      thumbnailUrl: buildStreamThumbnailUrl(fixture.streamVideoId),
+    })
   ),
 ]
-const seedMediaStreamIds = seedMediaAssets.map((asset) => asset.streamVideoId)
 
-const seedAdLibrary: AdAssetInsert[] = [
+const seedAdLibrary: AdAssetInsert[] = seedAdMediaFixtures.map((fixture) =>
   createAdLibraryItem(
-    "ad:eight-sleep-v1",
-    eightSleepV1MediaAssetId,
-    "Eight Sleep Q4 Pod 3 - v1"
-  ),
-  createAdLibraryItem(
-    "ad:eight-sleep-v2",
-    eightSleepV2MediaAssetId,
-    "Eight Sleep Q4 Pod 3 - v2"
-  ),
-  createAdLibraryItem(
-    "ad:brilliant-maths-physics",
-    brilliantMediaAssetId,
-    "Brilliant (maths & physics)"
-  ),
-]
+    `ad:${fixture.key}`,
+    getSeedMediaAssetId(fixture.key),
+    fixture.title
+  )
+)
 
 const seedAdBreaks: AdBreakInsert[] = [
   {
@@ -185,16 +228,40 @@ const seedAdBreaks: AdBreakInsert[] = [
 
 const seedAdBreakVariants: AdBreakVariantInsert[] = [
   {
+    id: createSeedId("break-variant:auto:1"),
+    adBreakId: createSeedId("break:1"),
+    adAssetId: getSeedAdAssetId("example-ad-01-90s"),
+    ordinal: 1,
+    weight: 3,
+    status: "active",
+  },
+  {
+    id: createSeedId("break-variant:auto:2"),
+    adBreakId: createSeedId("break:1"),
+    adAssetId: getSeedAdAssetId("example-ad-02-90s"),
+    ordinal: 2,
+    weight: 2,
+    status: "active",
+  },
+  {
+    id: createSeedId("break-variant:auto:3"),
+    adBreakId: createSeedId("break:1"),
+    adAssetId: getSeedAdAssetId("example-ad-06-classic"),
+    ordinal: 3,
+    weight: 1,
+    status: "active",
+  },
+  {
     id: createSeedId("break-variant:static:1"),
     adBreakId: staticBreakId,
-    adAssetId: createSeedId("ad:eight-sleep-v1"),
+    adAssetId: getSeedAdAssetId("example-ad-04-90s"),
     ordinal: 1,
     status: "active",
   },
   {
     id: createSeedId("break-variant:ab:1"),
     adBreakId: abBreakId,
-    adAssetId: createSeedId("ad:eight-sleep-v2"),
+    adAssetId: getSeedAdAssetId("example-ad-05-90s"),
     ordinal: 1,
     isControl: true,
     weight: 1,
@@ -203,29 +270,29 @@ const seedAdBreakVariants: AdBreakVariantInsert[] = [
   {
     id: createSeedId("break-variant:ab:2"),
     adBreakId: abBreakId,
-    adAssetId: createSeedId("ad:brilliant-maths-physics"),
+    adAssetId: getSeedAdAssetId("example-ad-09-classic"),
     ordinal: 2,
     weight: 1,
     status: "active",
   },
 ]
 
-const seedAdTitles = seedAdLibrary.map((ad) => ad.title)
+const legacySeedAdTitles = [
+  "Eight Sleep Q4 Pod 3 - v1",
+  "Eight Sleep Q4 Pod 3 - v2",
+  "Brilliant (maths & physics)",
+]
+const seedAdTitles = [...legacySeedAdTitles, ...seedAdLibrary.map((ad) => ad.title)]
 
 export const seedDatabase = async () => {
   const seedBreakIds = seedAdBreaks.map((b) => b.id!)
-  const seedBreakVariantIds = seedAdBreakVariants.map((variant) => variant.id!)
 
+  await db.delete(playbackSessions).where(inArray(playbackSessions.episodeId, [episodeId]))
   await db
     .delete(adBreakVariants)
-    .where(inArray(adBreakVariants.id, seedBreakVariantIds))
+    .where(inArray(adBreakVariants.adBreakId, seedBreakIds))
   await db.delete(adBreaks).where(inArray(adBreaks.id, seedBreakIds))
   await db.delete(adAssets).where(inArray(adAssets.title, seedAdTitles))
-  await db.delete(episodes).where(inArray(episodes.title, [episode.title]))
-  await db
-    .delete(mediaAssets)
-    .where(inArray(mediaAssets.streamVideoId, seedMediaStreamIds))
-  await db.delete(shows).where(inArray(shows.title, [show.title]))
 
   await db
     .insert(shows)
