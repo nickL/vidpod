@@ -113,6 +113,29 @@ export type PlaybackSessionStart = {
   resolvedBreaks: ResolvedPlaybackBreak[]
 }
 
+export type HlsPlan = {
+  playbackSessionId: string
+  episode: {
+    id: string
+    durationMs?: number
+    playbackUrl: string
+  }
+  resolvedBreaks: Array<{
+    adBreakId: string
+    requestedTimeMs: number
+    selectedVariant: {
+      id: string
+      adAssetId: string
+      adAssetTitle: string
+      mediaAsset: {
+        id: string
+        playbackUrl: string
+        durationMs?: number
+      }
+    }
+  }>
+}
+
 export type PlaybackEventInput = {
   playbackSessionId: string
   adBreakId: string

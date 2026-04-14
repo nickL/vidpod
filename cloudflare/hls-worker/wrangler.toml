@@ -1,0 +1,11 @@
+name = "hls-worker"
+main = "src/index.ts"
+compatibility_date = "2026-04-13"
+workers_dev = false
+
+routes = [
+  { pattern = "vidpod-hls.nlewis.dev", custom_domain = true }
+]
+
+[observability.logs]
+enabled = true

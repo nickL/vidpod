@@ -6,6 +6,7 @@ import {
   getDefaultEpisodeId,
   getEpisodeEditor,
 } from "@/features/episode-editor/server"
+import { serverEnv } from "@/env/server"
 import { getQueryClient } from "@/lib/react-query/get-query-client"
 
 export const dynamic = "force-dynamic"
@@ -24,7 +25,10 @@ const Home = async () => {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <EpisodeEditor episodeId={episodeId} />
+      <EpisodeEditor
+        episodeId={episodeId}
+        hlsBaseUrl={serverEnv.hlsWorkerPublicBaseUrl ?? undefined}
+      />
     </HydrationBoundary>
   )
 }

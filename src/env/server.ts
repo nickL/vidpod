@@ -30,6 +30,9 @@ export const serverEnv = {
   get cloudflareWorkerPublicBaseUrl() {
     return readOptionalEnv("CLOUDFLARE_WORKER_PUBLIC_BASE_URL")
   },
+  get hlsWorkerPublicBaseUrl() {
+    return readOptionalEnv("HLS_WORKER_PUBLIC_BASE_URL")
+  },
   get mediaJobsToken() {
     return readOptionalEnv("MEDIA_JOBS_TOKEN")
   },

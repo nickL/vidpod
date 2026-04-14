@@ -23,6 +23,7 @@ import {
 
 import type { PlaybackMarker } from "./playback-runtime"
 import type {
+  HlsPlan,
   PlaybackEventInput,
   PlaybackSession,
   PlaybackSessionStart,
@@ -427,4 +428,74 @@ export const recordPlaybackEvent = async ({
     playheadTimeMs,
     metadataJson,
   })
+}
+
+export const getHlsPlan = async (
+  playbackSessionId: string
+): Promise<HlsPlan> => {
+  const [session] = await db
+    .select({
+      episodeId: episodes.id,
+      episodeDurationMs: episodes.durationMs,
+      mainMediaAssetId: mediaAssets.id,
+      mainMediaStreamVideoId: mediaAssets.streamVideoId,
+      mainMediaPlaybackUrl: mediaAssets.playbackUrl,
+      mainMediaDurationMs: mediaAssets.durationMs,
+    })
+    .from(playbackSessions)
+    .innerJoin(episodes, eq(playbackSessions.episodeId, episodes.id))
+    .leftJoin(mediaAssets, eq(episodes.mainMediaAssetId, mediaAssets.id))
+    .where(eq(playbackSessions.id, playbackSessionId))
+    .limit(1)
+
+  if (!session) {
+    throw new Error(`Playback session not found: ${playbackSessionId}`)
+  }
+
+  if (!session.mainMediaAssetId || !session.mainMediaStreamVideoId) {
+    throw new Error("Episode main media is not available for HLS output")
+  }
+
+  const episodePlaybackUrl =
+    session.mainMediaPlaybackUrl ??
+    buildStreamPlaybackUrl(session.mainMediaStreamVideoId)
+
+  if (!episodePlaybackUrl) {
+    throw new Error("Episode HLS playback URL is not available")
+  }
+
+  const resolvedBreaks = await loadResolvedPlaybackBreaks(playbackSessionId)
+
+  return {
+    playbackSessionId,
+    episode: {
+      id: session.episodeId,
+      durationMs: session.episodeDurationMs ?? session.mainMediaDurationMs ?? undefined,
+      playbackUrl: episodePlaybackUrl,
+    },
+    resolvedBreaks: resolvedBreaks.map((playbackBreak) => {
+      const adPlaybackUrl = playbackBreak.selectedVariant.mediaAsset.playbackUrl
+
+      if (!adPlaybackUrl) {
+        throw new Error(
+          `Ad playback URL is not available for break ${playbackBreak.adBreakId}`
+        )
+      }
+
+      return {
+        adBreakId: playbackBreak.adBreakId,
+        requestedTimeMs: playbackBreak.requestedTimeMs,
+        selectedVariant: {
+          id: playbackBreak.selectedVariant.id,
+          adAssetId: playbackBreak.selectedVariant.adAssetId,
+          adAssetTitle: playbackBreak.selectedVariant.adAssetTitle,
+          mediaAsset: {
+            id: playbackBreak.selectedVariant.mediaAsset.id,
+            playbackUrl: adPlaybackUrl,
+            durationMs: playbackBreak.selectedVariant.mediaAsset.durationMs,
+          },
+        },
+      }
+    }),
+  }
 }

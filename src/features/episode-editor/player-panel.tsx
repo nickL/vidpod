@@ -36,9 +36,7 @@ type PlayerPanelProps = {
   uploadError?: string
   videoUploadProgress?: UploadProgressState
   canPreviewHls: boolean
-  canResetDemo: boolean
   isPreparingPreview: boolean
-  isResettingDemo: boolean
   setVideoRef: (node: HTMLVideoElement | null) => void
   onDurationChange: () => void
   onLoadedMetadata: () => void
@@ -53,7 +51,6 @@ type PlayerPanelProps = {
   onTogglePlayback: () => void | Promise<void>
   onPreviewHls: () => void | Promise<void>
   onAddEpisodeVideo: (file: File) => void | Promise<void>
-  onResetDemo: () => void | Promise<void>
   onRemoveEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
   onUseEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
 }
@@ -66,9 +63,7 @@ export const PlayerPanel = ({
   uploadError,
   videoUploadProgress,
   canPreviewHls,
-  canResetDemo,
   isPreparingPreview,
-  isResettingDemo,
   setVideoRef,
   onDurationChange,
   onLoadedMetadata,
@@ -83,7 +78,6 @@ export const PlayerPanel = ({
   onTogglePlayback,
   onPreviewHls,
   onAddEpisodeVideo,
-  onResetDemo,
   onRemoveEpisodeVideo,
   onUseEpisodeVideo,
 }: PlayerPanelProps) => {
@@ -113,16 +107,7 @@ export const PlayerPanel = ({
 
   return (
     <section className="@container flex flex-col gap-4 rounded-2xl border border-zinc-200 bg-white p-8">
-      <div className="flex items-center gap-2">
-        {canResetDemo ? (
-          <Button
-            variant="outline"
-            disabled={isEpisodeUploadActive || isResettingDemo}
-            onClick={() => void onResetDemo()}
-          >
-            {isResettingDemo ? "Resetting demo…" : "Reset demo"}
-          </Button>
-        ) : null}
+      <div className="flex items-center justify-end gap-2">
         <input
           ref={uploadInputRef}
           type="file"
@@ -130,24 +115,22 @@ export const PlayerPanel = ({
           className="hidden"
           onChange={handleVideoFileChange}
         />
-        <div className="ml-auto flex items-center gap-2">
-          {canPreviewHls ? (
-            <Button
-              variant="outline"
-              disabled={!playbackUrl || isPreparingPreview}
-              onClick={() => void onPreviewHls()}
-            >
-              {isPreparingPreview ? "Preparing HLS…" : "Preview HLS"}
-            </Button>
-          ) : null}
+        {canPreviewHls ? (
           <Button
-            disabled={isEpisodeUploadActive}
-            onClick={handleAddVideoClick}
+            variant="outline"
+            disabled={!playbackUrl || isPreparingPreview}
+            onClick={() => void onPreviewHls()}
           >
-            <RiAddLine />
-            Add new video
+            {isPreparingPreview ? "Preparing HLS…" : "Preview HLS"}
           </Button>
-        </div>
+        ) : null}
+        <Button
+          disabled={isEpisodeUploadActive}
+          onClick={handleAddVideoClick}
+        >
+          <RiAddLine />
+          Add new video
+        </Button>
       </div>
       {uploadError ? (
         <p className="text-sm text-red-600">{uploadError}</p>
