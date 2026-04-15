@@ -1,0 +1,1 @@
+ALTER TABLE "mp4_export_jobs" ADD COLUMN "phase" text;

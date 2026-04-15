@@ -1,3 +1,6 @@
+packages:
+  - cloudflare/*
+
 ignoredBuiltDependencies:
   - sharp
   - unrs-resolver

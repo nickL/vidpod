@@ -16,6 +16,20 @@ export const mediaWaveformStatusEnum = pgEnum("media_waveform_status", [
   "failed",
 ])
 
+export const mp4ExportJobStatusEnum = pgEnum("mp4_export_job_status", [
+  "queued",
+  "processing",
+  "ready",
+  "failed",
+])
+
+export const transcriptionJobStatusEnum = pgEnum("transcription_job_status", [
+  "queued",
+  "processing",
+  "ready",
+  "failed",
+])
+
 export const adAssetStatusEnum = pgEnum("ad_asset_status", ["active", "archived"])
 
 export const adBreakSelectionModeEnum = pgEnum("ad_break_selection_mode", [

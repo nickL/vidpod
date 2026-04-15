@@ -1,0 +1,19 @@
+{
+  "name": "vidpod-mp4-exporter",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "cd ../.. && pnpm exec wrangler deploy -c cloudflare/mp4-exporter/wrangler.jsonc",
+    "dev": "cd ../.. && pnpm exec wrangler dev -c cloudflare/mp4-exporter/wrangler.jsonc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.0.29",
+    "tsx": "^4.21.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.22",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.11.1"
+  }
+}

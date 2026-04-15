@@ -9,7 +9,8 @@ import {
   recordPlaybackEvent,
   startPlaybackSession,
 } from "./playback/playback-sessions"
-import { generateMp4Export } from "./mp4-export/mp4-export"
+import { startMp4ExportJob } from "./mp4-export-jobs"
+import { startTranscriptJob } from "./transcript/transcript-jobs"
 import {
   failUpload,
   resetDemoEpisode,
@@ -55,10 +56,12 @@ export const recordPlaybackEventAction = async (
   return recordPlaybackEvent(input)
 }
 
-export const generateMp4ExportAction = async (
-  playbackSessionId: string
-) => {
-  return generateMp4Export(playbackSessionId)
+export const startMp4ExportJobAction = async (playbackSessionId: string) => {
+  return startMp4ExportJob(playbackSessionId)
+}
+
+export const startTranscriptJobAction = async (mediaAssetId: string) => {
+  return startTranscriptJob(mediaAssetId)
 }
 
 export const startUploadAction = async (input: UploadInitInput) => {

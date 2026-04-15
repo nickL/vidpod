@@ -2,11 +2,46 @@ import { NextResponse } from "next/server"
 
 import { serverEnv } from "@/env/server"
 import {
-  applyWaveformStateUpdate,
+  updateWaveformState,
   type WaveformStateUpdate,
 } from "@/editor/waveforms/waveform-jobs"
 
 export const dynamic = "force-dynamic"
+
+const asObject = (value: unknown) =>
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null
+
+const isNumberArray = (value: unknown): value is number[] =>
+  Array.isArray(value) && value.every((item) => typeof item === "number")
+
+const parseUpdate = (value: unknown): WaveformStateUpdate | null => {
+  const payload = asObject(value)
+
+  if (
+    !payload ||
+    typeof payload.mediaAssetId !== "string" ||
+    typeof payload.event !== "string"
+  ) {
+    return null
+  }
+
+  switch (payload.event) {
+    case "processing":
+      return payload as WaveformStateUpdate
+    case "ready":
+      return typeof payload.bucketCount === "number" && isNumberArray(payload.peaks)
+        ? (payload as WaveformStateUpdate)
+        : null
+    case "failed":
+      return typeof payload.error === "string"
+        ? (payload as WaveformStateUpdate)
+        : null
+    default:
+      return null
+  }
+}
 
 const isAuthorized = (request: Request) => {
   const mediaJobsToken = serverEnv.mediaJobsToken
@@ -16,37 +51,6 @@ const isAuthorized = (request: Request) => {
   }
 
   return request.headers.get("authorization") === `Bearer ${mediaJobsToken}`
-}
-
-const isWaveformStateUpdate = (value: unknown): value is WaveformStateUpdate => {
-  if (!value || typeof value !== "object") {
-    return false
-  }
-
-  const payload = value as Record<string, unknown>
-
-  if (typeof payload.mediaAssetId !== "string") {
-    return false
-  }
-
-  if (payload.event === "processing") {
-    return true
-  }
-
-  if (
-    payload.event === "ready" &&
-    typeof payload.bucketCount === "number" &&
-    Array.isArray(payload.peaks) &&
-    payload.peaks.every((peak) => typeof peak === "number")
-  ) {
-    return true
-  }
-
-  if (payload.event === "failed" && typeof payload.error === "string") {
-    return true
-  }
-
-  return false
 }
 
 export const POST = async (request: Request) => {
@@ -61,16 +65,16 @@ export const POST = async (request: Request) => {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
-  const payload = await request.json().catch(() => null)
+  const payload = parseUpdate(await request.json().catch(() => null))
 
-  if (!isWaveformStateUpdate(payload)) {
+  if (!payload) {
     return NextResponse.json(
       { error: "Invalid waveform state update payload." },
       { status: 400 }
     )
   }
 
-  await applyWaveformStateUpdate(payload)
+  await updateWaveformState(payload)
 
   return NextResponse.json({ ok: true })
 }

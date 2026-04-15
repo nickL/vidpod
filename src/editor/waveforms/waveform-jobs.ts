@@ -229,7 +229,7 @@ export const failWaveform = async ({
   })
 }
 
-export const applyWaveformStateUpdate = async (
+export const updateWaveformState = async (
   update: WaveformStateUpdate
 ) => {
   switch (update.event) {

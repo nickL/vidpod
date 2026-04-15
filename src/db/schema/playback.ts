@@ -4,12 +4,14 @@ import {
   jsonb,
   pgTable,
   timestamp,
+  text,
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core"
 
 import {
   adBreakSelectionModeEnum,
+  mp4ExportJobStatusEnum,
   playbackEventTypeEnum,
   playbackSessionModeEnum,
   playbackSessionStatusEnum,
@@ -94,5 +96,28 @@ export const playbackEvents = pgTable(
     index("playback_events_session_id_idx").on(table.playbackSessionId),
     index("playback_events_break_id_idx").on(table.adBreakId),
     index("playback_events_type_idx").on(table.eventType),
+  ]
+)
+
+export const mp4ExportJobs = pgTable(
+  "mp4_export_jobs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    playbackSessionId: uuid("playback_session_id")
+      .notNull()
+      .references(() => playbackSessions.id, { onDelete: "cascade" }),
+    status: mp4ExportJobStatusEnum("status").notNull().default("queued"),
+    phase: text("phase"),
+    outputJson: jsonb("output_json"),
+    progressMessage: text("progress_message"),
+    error: text("error"),
+    startedAt: timestamp("started_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("mp4_export_jobs_session_id_idx").on(table.playbackSessionId),
+    index("mp4_export_jobs_status_idx").on(table.status),
   ]
 )

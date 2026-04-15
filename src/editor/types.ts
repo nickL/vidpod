@@ -1,5 +1,10 @@
+import type { Mp4ExportJobPhase } from "./mp4-export/phases"
+import type { TranscriptJobPhase } from "./transcript/phases"
+
 export type MediaStatus = "uploading" | "processing" | "ready" | "failed"
 export type MediaWaveformStatus = "pending" | "processing" | "ready" | "failed"
+export type Mp4ExportJobStatus = "queued" | "processing" | "ready" | "failed"
+export type TranscriptJobStatus = "queued" | "processing" | "ready" | "failed"
 
 export type MediaWaveform = {
   status: MediaWaveformStatus
@@ -134,9 +139,64 @@ export type Mp4Plan = {
   resolvedBreaks: HlsPlan["resolvedBreaks"]
 }
 
-export type Mp4Export = {
-  downloadUrl: string
+export type Mp4ExportArtifact = {
+  storage: "r2"
+  key: string
   fileName: string
+  contentType: "video/mp4"
+  sizeBytes?: number
+}
+
+export type TranscriptArtifact = {
+  storage: "r2"
+  key: string
+  fileName: string
+  contentType: "application/json"
+}
+
+export type Mp4ExportJob = {
+  id: string
+  playbackSessionId: string
+  status: Mp4ExportJobStatus
+  phase?: Mp4ExportJobPhase
+  progressMessage?: string
+  error?: string
+  output?: Mp4ExportArtifact
+  createdAt: string
+  startedAt?: string
+  completedAt?: string
+  updatedAt: string
+}
+
+export type TranscriptJob = {
+  id: string
+  mediaAssetId: string
+  status: TranscriptJobStatus
+  phase?: TranscriptJobPhase
+  progressMessage?: string
+  error?: string
+  totalChunks?: number
+  completedChunks?: number
+  createdAt: string
+  startedAt?: string
+  completedAt?: string
+  updatedAt: string
+}
+
+export type TranscriptWord = {
+  word: string
+  start: number
+  end: number
+}
+
+export type MediaTranscript = {
+  id: string
+  mediaAssetId: string
+  jobId: string
+  text: string
+  words: TranscriptWord[]
+  createdAt: string
+  updatedAt: string
 }
 
 export type PlaybackEventInput = {
@@ -156,6 +216,7 @@ export type EditorData = {
   episodeVideoAssets: EpisodeVideoAsset[]
   canResetDemo: boolean
   mainMediaAsset?: MediaAsset
+  transcriptJob?: TranscriptJob
 }
 
 export type UploadTarget = "episode" | "ad"

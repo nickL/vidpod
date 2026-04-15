@@ -14,6 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
+import type { Mp4ExportJob } from "../types"
+
 const HLS_JS_SUPPORTED = Hls.isSupported()
 
 const STATUS_CARD_STYLES = {
@@ -41,9 +43,8 @@ type HLSDebugModalProps = {
   open: boolean
   manifestUrl?: string
   isLoading: boolean
-  isGeneratingMp4: boolean
-  downloadUrl?: string
-  downloadError?: string
+  isStartingMp4Export: boolean
+  mp4Job?: Mp4ExportJob
   error?: string
   onGenerateMp4: () => void | Promise<void>
   onOpenChange: (open: boolean) => void
@@ -105,9 +106,8 @@ export const HLSDebugModal = ({
   open,
   manifestUrl,
   isLoading,
-  isGeneratingMp4,
-  downloadUrl,
-  downloadError,
+  isStartingMp4Export,
+  mp4Job,
   error,
   onGenerateMp4,
   onOpenChange,
@@ -129,6 +129,26 @@ export const HLSDebugModal = ({
       ? playerError.message
       : undefined
   const copied = Boolean(manifestUrl && copiedUrl === manifestUrl)
+  const isGeneratingMp4 =
+    isStartingMp4Export ||
+    mp4Job?.status === "queued" ||
+    mp4Job?.status === "processing"
+  const downloadHref = mp4Job
+    ? `/api/mp4-export-jobs/${mp4Job.id}/download`
+    : undefined
+  const showDownload = mp4Job?.status === "ready" && Boolean(mp4Job.output)
+  const downloadError = mp4Job?.status === "failed" ? mp4Job.error : undefined
+  let generateMp4Label = "Generate MP4"
+  let generateMp4Title = "Generating MP4"
+
+  if (isStartingMp4Export) {
+    generateMp4Label = "Starting MP4…"
+    generateMp4Title = "Starting MP4 export"
+  } else if (isGeneratingMp4) {
+    generateMp4Label = "Generating MP4…"
+    generateMp4Title =
+      mp4Job?.status === "queued" ? "Queued MP4 export" : "Generating MP4"
+  }
 
   const getDisplayError = () => {
     if (error) return error
@@ -215,13 +235,13 @@ export const HLSDebugModal = ({
                 {copied ? <Check /> : <Copy />}
                 {copied ? "Copied" : "Copy"}
               </Button>
-              {downloadUrl ? null : (
+              {showDownload ? null : (
                 <Button
                   size="sm"
                   disabled={isLoading || isGeneratingMp4}
                   onClick={() => void onGenerateMp4()}
                 >
-                  {isGeneratingMp4 ? "Generating MP4…" : "Generate MP4"}
+                  {generateMp4Label}
                 </Button>
               )}
             </div>
@@ -229,19 +249,19 @@ export const HLSDebugModal = ({
           {isGeneratingMp4 ? (
             <StatusCard
               icon={<LoaderCircle className="size-4 animate-spin" />}
-              title="Generating MP4"
+              title={generateMp4Title}
             >
-              Stitching up the episode and inserted ads on the server...
-              Download link will show here when ready.
+              {mp4Job?.progressMessage ??
+                "Stitching up the episode and inserted ads on the server... Download link will show here when ready."}
             </StatusCard>
-          ) : downloadUrl ? (
+          ) : showDownload && downloadHref ? (
             <StatusCard
               icon={<Download className="size-4" />}
               tone="success"
               title="MP4 ready"
               action={
                 <a
-                  href={downloadUrl}
+                  href={downloadHref}
                   download
                   className={cn(buttonVariants({ size: "sm" }))}
                 >

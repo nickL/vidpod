@@ -1,0 +1,58 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "vidpod-mp4-exporter",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "observability": {
+    "enabled": true
+  },
+  "containers": [
+    {
+      "class_name": "Mp4Exporter",
+      "name": "vidpod-mp4-exporter",
+      "image": "../../Dockerfile.mp4-exporter",
+      "instance_type": "standard-4",
+      "max_instances": 2
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "class_name": "Mp4Exporter",
+        "name": "MP4_EXPORTER"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "new_sqlite_classes": ["Mp4Exporter"],
+      "tag": "v1"
+    }
+  ],
+  "env": {
+    "dev": {
+      "name": "vidpod-mp4-exporter-dev",
+      "workers_dev": true,
+      "routes": [],
+      "containers": [
+        {
+          "class_name": "Mp4Exporter",
+          "name": "vidpod-mp4-exporter-dev",
+          "image": "../../Dockerfile.mp4-exporter",
+          "instance_type": "standard-4",
+          "max_instances": 2
+        }
+      ],
+      "durable_objects": {
+        "bindings": [
+          {
+            "class_name": "Mp4Exporter",
+            "name": "MP4_EXPORTER"
+          }
+        ]
+      }
+    }
+  }
+}

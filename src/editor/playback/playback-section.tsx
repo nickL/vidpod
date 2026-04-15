@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 
 import {
-  generateMp4ExportAction,
   recordPlaybackEventAction,
+  startMp4ExportJobAction,
   startPlaybackSessionAction,
 } from "../actions"
 import { HLSDebugModal } from "../mp4-export/hls-debug-modal"
@@ -17,6 +17,7 @@ import type {
   Marker,
   MarkerActivation,
   MediaAsset,
+  Mp4ExportJob,
   UploadProgressState,
 } from "../types"
 
@@ -52,6 +53,10 @@ const getPlaybackSessionStorageKey = (episodeId: string) => {
   return `vidpod:playback-session:${episodeId}`
 }
 
+const isRunningMp4Export = (job?: Mp4ExportJob) => {
+  return job?.status === "queued" || job?.status === "processing"
+}
+
 export const PlaybackSection = ({
   episodeId,
   hlsBaseUrl,
@@ -79,18 +84,14 @@ export const PlaybackSection = ({
   onRemoveEpisodeVideo,
   onSelectEpisodeVideo,
 }: PlaybackSectionProps) => {
-
-
   const previewConfigKeyRef = useRef(previewConfigKey)
   const [isPreviewOpen, setIsPreviewOpen] = useState(false)
   const [isPreparingPreview, setIsPreparingPreview] = useState(false)
-  const [isGeneratingMp4, setIsGeneratingMp4] = useState(false)
+  const [isStartingMp4Export, setIsStartingMp4Export] = useState(false)
   const [previewSessionId, setPreviewSessionId] = useState<string>()
   const [previewManifestUrl, setPreviewManifestUrl] = useState<string>()
   const [previewError, setPreviewError] = useState<string>()
-  const [downloadUrl, setDownloadUrl] = useState<string>()
-  const [downloadError, setDownloadError] = useState<string>()
-
+  const [mp4Job, setMp4Job] = useState<Mp4ExportJob>()
 
   const startPlaybackSession = useCallback(
     async (playheadTimeMs: number) => {
@@ -158,6 +159,13 @@ export const PlaybackSection = ({
 
     previewConfigKeyRef.current = previewConfigKey
     window.sessionStorage.removeItem(getPlaybackSessionStorageKey(episodeId))
+    setIsPreviewOpen(false)
+    setIsPreparingPreview(false)
+    setIsStartingMp4Export(false)
+    setPreviewSessionId(undefined)
+    setPreviewManifestUrl(undefined)
+    setPreviewError(undefined)
+    setMp4Job(undefined)
   }, [episodeId, previewConfigKey])
 
   useEffect(() => {
@@ -168,21 +176,23 @@ export const PlaybackSection = ({
     seekToTime(markerActivation.requestedTimeMs)
   }, [markerActivation, seekToTime])
 
-
   // Toggle Playback via Spacebar
   useSpacebarPlayPause(togglePlayback)
 
-
-  const openPreview = useCallback(async () => {
+  const openHlsPreview = useCallback(async () => {
     if (!normalizedHlsBaseUrl) {
+      return
+    }
+
+    if (previewSessionId && previewManifestUrl) {
+      setIsPreviewOpen(true)
       return
     }
 
     setIsPreviewOpen(true)
     setIsPreparingPreview(true)
     setPreviewError(undefined)
-    setDownloadUrl(undefined)
-    setDownloadError(undefined)
+    setMp4Job(undefined)
 
     try {
       const playbackSessionStart = await startPlaybackSessionAction({
@@ -201,47 +211,86 @@ export const PlaybackSection = ({
     } finally {
       setIsPreparingPreview(false)
     }
-  }, [episodeId, normalizedHlsBaseUrl])
+  }, [episodeId, normalizedHlsBaseUrl, previewManifestUrl, previewSessionId])
 
-  const generateMp4 = useCallback(async () => {
-    if (!previewSessionId) {
+  const startMp4Export = useCallback(async () => {
+    if (!previewSessionId || isStartingMp4Export) {
       return
     }
 
-    setIsGeneratingMp4(true)
-    setDownloadError(undefined)
+    setIsStartingMp4Export(true)
+    setPreviewError(undefined)
 
     try {
-      const exportResult = await generateMp4ExportAction(previewSessionId)
-
-      setDownloadUrl(exportResult.downloadUrl)
+      const job = await startMp4ExportJobAction(previewSessionId)
+      setMp4Job(job)
     } catch (error) {
-      
-      setDownloadUrl(undefined)
-      setDownloadError(
+      setMp4Job(undefined)
+      setPreviewError(
         error instanceof Error ? error.message : "Unable to generate MP4."
       )
-      
     } finally {
-      setIsGeneratingMp4(false)
+      setIsStartingMp4Export(false)
     }
-  }, [previewSessionId])
+  }, [isStartingMp4Export, previewSessionId])
 
   const handlePreviewOpenChange = useCallback((open: boolean) => {
     setIsPreviewOpen(open)
+  }, [])
 
-    if (open) {
+  // Note: key the poll on the job id so setMp4Job() inside pollJob doesn't re-run this effect on every response.
+  const runningJobId = isRunningMp4Export(mp4Job) ? mp4Job?.id : undefined
+
+  useEffect(() => {
+    if (!runningJobId) {
       return
     }
 
-    setIsPreparingPreview(false)
-    setIsGeneratingMp4(false)
-    setPreviewSessionId(undefined)
-    setPreviewManifestUrl(undefined)
-    setPreviewError(undefined)
-    setDownloadUrl(undefined)
-    setDownloadError(undefined)
-  }, [])
+    let cancelled = false
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+    const pollJob = async () => {
+      try {
+        const response = await fetch(`/api/mp4-export-jobs/${runningJobId}`, {
+          cache: "no-store",
+        })
+
+        if (!response.ok) {
+          throw new Error("Couldn't refresh MP4 export status.")
+        }
+
+        const nextJob = (await response.json()) as Mp4ExportJob
+
+        if (cancelled) {
+          return
+        }
+
+        setMp4Job(nextJob)
+
+        if (isRunningMp4Export(nextJob)) {
+          timeoutId = setTimeout(() => {
+            void pollJob()
+          }, 2000)
+        }
+      } catch {
+        if (!cancelled) {
+          timeoutId = setTimeout(() => {
+            void pollJob()
+          }, 2000)
+        }
+      }
+    }
+
+    void pollJob()
+
+    return () => {
+      cancelled = true
+
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [runningJobId])
 
   return (
     <>
@@ -268,7 +317,7 @@ export const PlaybackSection = ({
         onJumpToStart={seekToStart}
         onJumpToEnd={seekToEnd}
         onTogglePlayback={togglePlayback}
-        onPreviewHls={openPreview}
+        onPreviewHls={openHlsPreview}
         onAddEpisodeVideo={onAddEpisodeVideo}
         onResetDemo={onResetDemo}
         onRemoveEpisodeVideo={onRemoveEpisodeVideo}
@@ -278,11 +327,10 @@ export const PlaybackSection = ({
         open={isPreviewOpen}
         manifestUrl={previewManifestUrl}
         isLoading={isPreparingPreview}
-        isGeneratingMp4={isGeneratingMp4}
-        downloadUrl={downloadUrl}
-        downloadError={downloadError}
+        isStartingMp4Export={isStartingMp4Export}
+        mp4Job={mp4Job}
         error={previewError}
-        onGenerateMp4={generateMp4}
+        onGenerateMp4={startMp4Export}
         onOpenChange={handlePreviewOpenChange}
       />
       <Timeline

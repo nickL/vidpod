@@ -40,4 +40,13 @@ export const serverEnv = {
   get mediaJobsToken() {
     return readOptionalEnv("MEDIA_JOBS_TOKEN")
   },
+  get cloudflareR2S3AccessKeyId() {
+    return readOptionalEnv("CLOUDFLARE_R2_S3_ACCESS_KEY_ID")
+  },
+  get cloudflareR2S3SecretAccessKey() {
+    return readOptionalEnv("CLOUDFLARE_R2_S3_SECRET_ACCESS_KEY")
+  },
+  get cloudflareR2Bucket() {
+    return readOptionalEnv("CLOUDFLARE_R2_BUCKET")
+  },
 }
