@@ -8,7 +8,7 @@ import { MobileSidebar } from "./mobile-sidebar"
 export const AppShell = ({ children }: { children: React.ReactNode }) => {
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="sticky top-0 z-30 bg-background">
+      <div className="sticky top-0 z-30 bg-background/80 backdrop-blur-xl backdrop-saturate-150">
         <AppHeader />
       </div>
       <div className="flex flex-1">

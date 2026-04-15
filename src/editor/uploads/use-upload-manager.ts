@@ -228,6 +228,45 @@ export const useUploadManager = ({
     ]
   )
 
+  useEffect(() => {
+    if (!episodeVideoAssets?.length) {
+      return
+    }
+
+    const inFlightEpisodeVideos = episodeVideoAssets.filter((episodeVideoAsset) => {
+      const mediaAssetId = episodeVideoAsset.mediaAsset.id
+      const status = episodeVideoAsset.mediaAsset.status
+
+      if (uploadProgressByMediaAssetId[mediaAssetId]) {
+        return false
+      }
+
+      return status === "uploading" || status === "processing"
+    })
+
+    if (inFlightEpisodeVideos.length === 0) {
+      return
+    }
+
+    const recoverUploads = async () => {
+      for (const episodeVideoAsset of inFlightEpisodeVideos) {
+        const mediaAssetId = episodeVideoAsset.mediaAsset.id
+
+        if (pollTimeoutsRef.current[mediaAssetId] !== undefined) {
+          continue
+        }
+
+        await pollStatus({
+          target: "episode",
+          assetId: episodeVideoAsset.id,
+          mediaAssetId,
+        })
+      }
+    }
+
+    recoverUploads().catch(() => undefined)
+  }, [episodeVideoAssets, pollStatus, uploadProgressByMediaAssetId])
+
   const uploadFile = useCallback(
     async (target: UploadTarget, file: File) => {
       let mediaAssetId: string | undefined

@@ -8,15 +8,15 @@ Dynamic ads editor for creators. Place markers for ad interstitials, live previe
 
 * TypeScript + Next.js + Tailwind.
 * Drizzle + Neon Postgres (app db for branching / fast iteration)
-* Cloudflare Workers + Stream + R2 for pipelines, HLS.js for playback.
+* Cloudflare Workers + Stream + R2 + DO for pipelines, HLS.js for playback.
 
 ## Setup
 
 ```bash
 pnpm install
-cp .env.example .env   # fill in the values
+cp .env.example .env  
 pnpm db:migrate
-pnpm db:seed           # loads the demo episode, ad library, and media used by the PoC
+pnpm db:seed   # loads the demo episode, ad library, and media used by the PoC
 pnpm dev
 ```
 
@@ -51,18 +51,15 @@ Place and arrange markers on the episode.
 
 - [x] Video and ad uploads
 - [x] Real waveforms
-- [x] MP4 render
+- [x] MP4 generation
 - [x] HLS output (single quality for now, multi coming)
+- [x] Transcription
+- [x] Durable pipelines
 
 ## Hosting
 
-The goal here is an edge-deployed PoC because video is bandwidth-heavy and egress fees are a pain at scale.
+The core app is edge-deployed on Cloudflare because video bandwidth and egress is a pain at scale. Keeping delivery, compute, and storage on the same network also helps with latency. Cloudflare Stream is used for HLS, Workers for the manifest/session work, and R2 handles persisting assets. Queues and Durable Objects coordinate all the async work, along with retries and recovery.
 
-For a production version of this, and where this repo is headed, I'd keep the core media pipelines on Cloudflare. That way delivery, compute, and storage are all on the same network. Use Stream for HLS, Workers for the manifest/session work, and `R2` for persisting exports. Then coordinate via Queues and Durable Objects to handle the async work, retries, and recovery.
-
-**Up next**:
-- Transcript pipeline
-- Durable pipelines
 
 ## Verify
 

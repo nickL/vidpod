@@ -44,7 +44,7 @@ export const projectIntro: ProjectIntro = {
           <strong>HLS Preview:</strong> Play or download the stitched stream.
         </li>
         <li>
-          <strong><i>Transcription:</i></strong> This is up next (check back in a few). Didn't want to delay getting it over.
+          <strong><i>Transcriptions:</i></strong>  Auto-generated on upload. Click words to scrub through.
         </li>
       </ul>
       <p>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, type ChangeEvent } from "react"
 import { AnimatePresence, motion } from "motion/react"
+import { Download, LoaderCircle } from "lucide-react"
 import {
   RiAddLine,
   RiContractLeftFill,
@@ -13,12 +14,12 @@ import {
   RiSpeedMiniFill,
 } from "react-icons/ri"
 
-import { Button } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { duration } from "@/lib/animation"
 import { capitalize, cn } from "@/lib/utils"
 
-import type { EpisodeVideoAsset, UploadProgressState } from "../types"
+import type { EpisodeVideoAsset, Mp4ExportJob, UploadProgressState } from "../types"
 
 const SKIP_INTERVAL_MS = 10_000
 const JUMP_INTERVAL_MS = 30_000
@@ -36,9 +37,13 @@ type PlayerPanelProps = {
   uploadError?: string
   videoUploadProgress?: UploadProgressState
   canPreviewHls: boolean
+  canExportMp4: boolean
   canResetDemo: boolean
   isPreparingPreview: boolean
   isResettingDemo: boolean
+  mp4Job?: Mp4ExportJob
+  isStartingMp4Export: boolean
+  mp4ExportError?: string
   setVideoRef: (node: HTMLVideoElement | null) => void
   onDurationChange: () => void
   onLoadedMetadata: () => void
@@ -52,10 +57,28 @@ type PlayerPanelProps = {
   onJumpToEnd: () => void
   onTogglePlayback: () => void | Promise<void>
   onPreviewHls: () => void | Promise<void>
+  onGenerateMp4: () => void | Promise<void>
+  onRegenerateMp4: () => void | Promise<void>
   onAddEpisodeVideo: (file: File) => void | Promise<void>
   onResetDemo: () => void | Promise<void>
   onRemoveEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
   onSelectEpisodeVideo: (episodeVideoAssetId: string) => void | Promise<void>
+}
+
+const MP4_PROGRESS_PERCENT_BY_PHASE: Record<string, number> = {
+  preparing: 15,
+  rendering: 60,
+  uploading: 90,
+}
+
+const IDLE_MP4_PROGRESS_PERCENT = 5
+
+const getMp4ProgressPercent = (job?: Mp4ExportJob) => {
+  if (!job) return IDLE_MP4_PROGRESS_PERCENT
+  if (job.status === "ready") return 100
+  return job.phase
+    ? (MP4_PROGRESS_PERCENT_BY_PHASE[job.phase] ?? IDLE_MP4_PROGRESS_PERCENT)
+    : IDLE_MP4_PROGRESS_PERCENT
 }
 
 export const PlayerPanel = ({
@@ -66,9 +89,13 @@ export const PlayerPanel = ({
   uploadError,
   videoUploadProgress,
   canPreviewHls,
+  canExportMp4,
   canResetDemo,
   isPreparingPreview,
   isResettingDemo,
+  mp4Job,
+  isStartingMp4Export,
+  mp4ExportError,
   setVideoRef,
   onDurationChange,
   onLoadedMetadata,
@@ -82,6 +109,8 @@ export const PlayerPanel = ({
   onJumpToEnd,
   onTogglePlayback,
   onPreviewHls,
+  onGenerateMp4,
+  onRegenerateMp4,
   onAddEpisodeVideo,
   onResetDemo,
   onRemoveEpisodeVideo,
@@ -90,7 +119,7 @@ export const PlayerPanel = ({
 
   
   const uploadInputRef = useRef<HTMLInputElement | null>(null)
-  const transportDisabled = !playbackUrl || Boolean(error)
+  const transportDisabled = !playbackUrl || !!error
   const isEpisodeUploadActive =
     replacementEpisodeVideo?.mediaAsset.status === "uploading" ||
     replacementEpisodeVideo?.mediaAsset.status === "processing"
@@ -143,17 +172,31 @@ export const PlayerPanel = ({
             </Button>
           ) : null}
           <Button
+            variant="outline"
             disabled={isEpisodeUploadActive}
             onClick={handleAddVideoClick}
           >
             <RiAddLine />
             Add new video
           </Button>
+          {canExportMp4 ? (
+            <Mp4ExportAffordance
+              job={mp4Job}
+              isStarting={isStartingMp4Export}
+              onGenerate={onGenerateMp4}
+              onRegenerate={onRegenerateMp4}
+            />
+          ) : null}
         </div>
       </div>
       {uploadError ? (
         <p className="text-sm text-red-600">{uploadError}</p>
       ) : null}
+      <Mp4ExportProgressRow
+        job={mp4Job}
+        isStarting={isStartingMp4Export}
+        error={mp4ExportError}
+      />
       <div className="overflow-hidden rounded-xl bg-zinc-950">
         {playbackUrl ? (
           <video
@@ -199,6 +242,102 @@ export const PlayerPanel = ({
         onJumpToEnd={onJumpToEnd}
       />
     </section>
+  )
+}
+
+const Mp4ExportAffordance = ({
+  job,
+  isStarting,
+  onGenerate,
+  onRegenerate,
+}: {
+  job?: Mp4ExportJob
+  isStarting: boolean
+  onGenerate: () => void | Promise<void>
+  onRegenerate: () => void | Promise<void>
+}) => {
+  if (job?.status === "ready" && job.output) {
+    return (
+      <a
+        href={`/api/mp4-export-jobs/${job.id}/download`}
+        download
+        className={cn(buttonVariants())}
+      >
+        <Download />
+        Download MP4
+      </a>
+    )
+  }
+
+  if (job?.status === "failed") {
+    return (
+      <Button onClick={() => void onRegenerate()}>
+        Retry MP4
+      </Button>
+    )
+  }
+
+  const isGenerating =
+    isStarting || job?.status === "queued" || job?.status === "processing"
+
+  return (
+    <Button disabled={isGenerating} onClick={() => void onGenerate()}>
+      {isGenerating ? (
+        <>
+          <LoaderCircle className="animate-spin" />
+          {isStarting ? "Starting…" : "Generating…"}
+        </>
+      ) : (
+        "Generate MP4"
+      )}
+    </Button>
+  )
+}
+
+const Mp4ExportProgressRow = ({
+  job,
+  isStarting,
+  error,
+}: {
+  job?: Mp4ExportJob
+  isStarting: boolean
+  error?: string
+}) => {
+  const isGenerating =
+    isStarting || job?.status === "queued" || job?.status === "processing"
+  const isVisible = isGenerating || !!error
+  const label = error
+    ? error
+    : job?.progressMessage ?? (isStarting ? "Starting MP4 export…" : "Preparing…")
+  const percent = getMp4ProgressPercent(job)
+
+  return (
+    <AnimatePresence initial={false}>
+      {isVisible ? (
+        <motion.div
+          key="mp4-progress"
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          exit={{ opacity: 0, height: 0 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          className="overflow-hidden"
+        >
+          <div className="flex items-center gap-3">
+            <span
+              className={cn(
+                "min-w-0 flex-1 truncate text-xs",
+                error ? "text-red-600" : "text-zinc-600"
+              )}
+            >
+              {label}
+            </span>
+            {isGenerating ? (
+              <Progress value={percent} className="w-40" />
+            ) : null}
+          </div>
+        </motion.div>
+      ) : null}
+    </AnimatePresence>
   )
 }
 

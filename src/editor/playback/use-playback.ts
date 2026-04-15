@@ -252,7 +252,7 @@ export const usePlayback = ({
       return
     }
 
-    const shouldPlay = Boolean(videoRef.current && !videoRef.current.paused)
+    const shouldPlay = !!(videoRef.current && !videoRef.current.paused)
 
     switchToEpisodePlayback({
       timeMs: activePlaybackSourceRef.current.resumeTimeMs,
@@ -412,7 +412,7 @@ export const usePlayback = ({
     (timeMs: number) => {
       const nextTimeMs = clampTimeMs(timeMs, durationMs)
       const video = videoRef.current
-      const shouldResumePlayback = Boolean(video && !video.paused)
+      const shouldResumePlayback = !!(video && !video.paused)
 
       if (activePlaybackSourceRef.current.kind === "episode" && video) {
         clearPreviewSeekTimeout()
@@ -539,6 +539,11 @@ export const usePlayback = ({
     }
 
     if (pendingSourceTimeRef.current !== undefined) {
+      return
+    }
+
+    // Some HLS seek failures emit a reset timeupdate at 0 with no loaded data.
+    if (video.readyState < 2) {
       return
     }
 

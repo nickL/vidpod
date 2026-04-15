@@ -2,9 +2,9 @@
 
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import Hls, { type ErrorData } from "hls.js"
-import { Check, Copy, Download, LoaderCircle, TriangleAlert } from "lucide-react"
+import { Check, Copy } from "lucide-react"
 
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import {
   Dialog,
@@ -14,39 +14,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 
-import type { Mp4ExportJob } from "../types"
-
 const HLS_JS_SUPPORTED = Hls.isSupported()
-
-const STATUS_CARD_STYLES = {
-  default: {
-    card: "border-zinc-200 bg-zinc-50",
-    icon: "text-zinc-700 ring-zinc-200",
-    text: "text-zinc-600",
-    title: "text-zinc-950",
-  },
-  success: {
-    card: "border-emerald-200 bg-emerald-50",
-    icon: "text-emerald-700 ring-emerald-200",
-    text: "text-emerald-800",
-    title: "text-emerald-950",
-  },
-  error: {
-    card: "border-red-200 bg-red-50",
-    icon: "text-red-700 ring-red-200",
-    text: "text-red-800",
-    title: "text-red-950",
-  },
-}
 
 type HLSDebugModalProps = {
   open: boolean
   manifestUrl?: string
   isLoading: boolean
-  isStartingMp4Export: boolean
-  mp4Job?: Mp4ExportJob
   error?: string
-  onGenerateMp4: () => void | Promise<void>
   onOpenChange: (open: boolean) => void
 }
 
@@ -73,43 +47,11 @@ const MessagePanel = ({
   </div>
 )
 
-const StatusCard = ({
-  icon,
-  tone = "default",
-  title,
-  action,
-  children,
-}: {
-  icon: ReactNode
-  tone?: "default" | "success" | "error"
-  title: string
-  action?: ReactNode
-  children: ReactNode
-}) => {
-  const styles = STATUS_CARD_STYLES[tone]
-
-  return (
-    <div className={cn("flex items-start gap-3 rounded-2xl border px-4 py-3", styles.card)}>
-      <div className={cn("mt-0.5 rounded-full bg-white p-2 ring-1", styles.icon)}>
-        {icon}
-      </div>
-      <div className="min-w-0 space-y-1">
-        <p className={cn("text-sm font-semibold", styles.title)}>{title}</p>
-        <p className={cn("text-sm leading-5", styles.text)}>{children}</p>
-        {action ? <div className="pt-1">{action}</div> : null}
-      </div>
-    </div>
-  )
-}
-
 export const HLSDebugModal = ({
   open,
   manifestUrl,
   isLoading,
-  isStartingMp4Export,
-  mp4Job,
   error,
-  onGenerateMp4,
   onOpenChange,
 }: HLSDebugModalProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null)
@@ -120,35 +62,13 @@ export const HLSDebugModal = ({
     message: string
   }>()
 
-  const supportsNativeHls = Boolean(
-    videoElement?.canPlayType("application/vnd.apple.mpegurl")
-  )
+  const supportsNativeHls = !!videoElement?.canPlayType("application/vnd.apple.mpegurl")
   const supportsPlayback = !videoElement || HLS_JS_SUPPORTED || supportsNativeHls
   const playbackError =
     playerError && manifestUrl && playerError.manifestUrl === manifestUrl
       ? playerError.message
       : undefined
-  const copied = Boolean(manifestUrl && copiedUrl === manifestUrl)
-  const isGeneratingMp4 =
-    isStartingMp4Export ||
-    mp4Job?.status === "queued" ||
-    mp4Job?.status === "processing"
-  const downloadHref = mp4Job
-    ? `/api/mp4-export-jobs/${mp4Job.id}/download`
-    : undefined
-  const showDownload = mp4Job?.status === "ready" && Boolean(mp4Job.output)
-  const downloadError = mp4Job?.status === "failed" ? mp4Job.error : undefined
-  let generateMp4Label = "Generate MP4"
-  let generateMp4Title = "Generating MP4"
-
-  if (isStartingMp4Export) {
-    generateMp4Label = "Starting MP4…"
-    generateMp4Title = "Starting MP4 export"
-  } else if (isGeneratingMp4) {
-    generateMp4Label = "Generating MP4…"
-    generateMp4Title =
-      mp4Job?.status === "queued" ? "Queued MP4 export" : "Generating MP4"
-  }
+  const copied = !!(manifestUrl && copiedUrl === manifestUrl)
 
   const getDisplayError = () => {
     if (error) return error
@@ -235,51 +155,7 @@ export const HLSDebugModal = ({
                 {copied ? <Check /> : <Copy />}
                 {copied ? "Copied" : "Copy"}
               </Button>
-              {showDownload ? null : (
-                <Button
-                  size="sm"
-                  disabled={isLoading || isGeneratingMp4}
-                  onClick={() => void onGenerateMp4()}
-                >
-                  {generateMp4Label}
-                </Button>
-              )}
             </div>
-          ) : null}
-          {isGeneratingMp4 ? (
-            <StatusCard
-              icon={<LoaderCircle className="size-4 animate-spin" />}
-              title={generateMp4Title}
-            >
-              {mp4Job?.progressMessage ??
-                "Stitching up the episode and inserted ads on the server... Download link will show here when ready."}
-            </StatusCard>
-          ) : showDownload && downloadHref ? (
-            <StatusCard
-              icon={<Download className="size-4" />}
-              tone="success"
-              title="MP4 ready"
-              action={
-                <a
-                  href={downloadHref}
-                  download
-                  className={cn(buttonVariants({ size: "sm" }))}
-                >
-                  Download MP4
-                </a>
-              }
-            >
-              The stitched export for this preview session is ready to
-              download.
-            </StatusCard>
-          ) : downloadError ? (
-            <StatusCard
-              icon={<TriangleAlert className="size-4" />}
-              tone="error"
-              title="Uh oh - Error generating MP4."
-            >
-              {downloadError}
-            </StatusCard>
           ) : null}
           {isLoading ? (
             <MessagePanel>Preparing HLS preview…</MessagePanel>

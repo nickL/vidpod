@@ -2,6 +2,8 @@ import { queryOptions } from "@tanstack/react-query"
 
 import type { EditorData } from "./types"
 
+const EDITOR_POLL_MS = 3_000
+
 export const getEpisodeEditorUrl = (episodeId: string) => {
   return `/api/episodes/${episodeId}/editor`
 }
@@ -24,5 +26,12 @@ export const episodeEditorQueryOptions = (episodeId: string) => {
   return queryOptions({
     queryKey: episodeEditorQueryKey(episodeId),
     queryFn: () => fetchEpisodeEditor(episodeId),
+    refetchInterval: (query) => {
+      const waveformStatus = query.state.data?.mainMediaAsset?.waveform?.status
+
+      return waveformStatus === "pending" || waveformStatus === "processing"
+        ? EDITOR_POLL_MS
+        : false
+    },
   })
 }
