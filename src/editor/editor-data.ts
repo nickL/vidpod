@@ -17,6 +17,7 @@ import { serverEnv } from "@/env/server"
 
 import { demoEpisodeMediaAssetId, isDemoEpisode } from "./demo"
 import { canMarkerPlay } from "./markers/marker-selection"
+import { getTranscriptJobForMediaAsset } from "./transcript/transcript-jobs"
 import { ensureWaveformRequested } from "./waveforms/waveform-jobs"
 
 import type { EditorData } from "./types"
@@ -287,6 +288,9 @@ export const getEpisodeEditor = async (
           : undefined,
       })
     : undefined
+  const transcriptJob = episode.mainMediaAssetId
+    ? await getTranscriptJobForMediaAsset(episode.mainMediaAssetId)
+    : undefined
 
   return {
     show: {
@@ -365,6 +369,7 @@ export const getEpisodeEditor = async (
         }),
       },
     })),
+    transcriptJob,
     episodeVideoAssets: episodeVideoRows.map((video) => ({
       id: video.id,
       title: video.title,

@@ -167,6 +167,7 @@ export const EpisodeEditor = ({
             hlsBaseUrl={hlsBaseUrl}
             episodeDurationMs={data.episode.durationMs}
             mainMediaAsset={data.mainMediaAsset}
+            transcriptJob={data.transcriptJob}
             replacementEpisodeVideo={replacementEpisodeVideo}
             uploadError={uploadErrorByTarget.episode}
             videoUploadProgress={

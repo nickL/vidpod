@@ -1,6 +1,7 @@
 import { AppSidebar } from "./app-sidebar"
 import { AppHeader } from "./app-header"
 import { AppFooter } from "./app-footer"
+import { APP_HEADER_HEIGHT_PX } from "./constants"
 import { DesktopOnlyNotice } from "./desktop-only-notice"
 import { MobileSidebar } from "./mobile-sidebar"
 
@@ -11,7 +12,10 @@ export const AppShell = ({ children }: { children: React.ReactNode }) => {
         <AppHeader />
       </div>
       <div className="flex flex-1">
-        <aside className="sticky top-[104px] hidden w-80 shrink-0 self-start border-r border-zinc-200 bg-sidebar lg:block">
+        <aside
+          className="sticky hidden w-80 shrink-0 self-start border-r border-zinc-200 bg-sidebar lg:block"
+          style={{ top: APP_HEADER_HEIGHT_PX }}
+        >
           <AppSidebar />
         </aside>
         <MobileSidebar />

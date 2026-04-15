@@ -14,6 +14,8 @@ import { serverEnv } from "@/env/server"
 
 import { demoEpisodeMediaAssetId, isDemoEpisode } from "../demo"
 import { endActivePlaybackSessions } from "../playback/playback-sessions"
+import { secondsToMs } from "../time"
+import { startTranscriptJob } from "../transcript/transcript-jobs"
 
 import type {
   AdLibraryItem,
@@ -432,9 +434,7 @@ const refreshMediaAsset = async ({
     .update(mediaAssets)
     .set({
       status: nextStatus,
-      durationMs: details.duration
-        ? Math.round(details.duration * 1000)
-        : null,
+      durationMs: details.duration ? secondsToMs(details.duration) : null,
       playbackUrl:
         nextStatus === "ready"
           ? buildStreamPlaybackUrl(details.uid, details.thumbnail ?? details.preview)
@@ -646,12 +646,24 @@ export const refreshUploadedAsset = async ({
   switch (target) {
     case "episode": {
       const { episodeVideoAsset } = await loadEpisodeVideoAsset(assetId)
+      const wasReady = episodeVideoAsset.mediaAsset.status === "ready"
+
       await refreshMediaAsset({
         mediaAssetId: episodeVideoAsset.mediaAsset.id,
         streamVideoId: episodeVideoAsset.mediaAsset.streamVideoId,
       })
 
-      return loadEpisodeVideoAsset(assetId)
+      const refreshed = await loadEpisodeVideoAsset(assetId)
+
+      if (!wasReady && refreshed.episodeVideoAsset.mediaAsset.status === "ready") {
+        try {
+          await startTranscriptJob(refreshed.episodeVideoAsset.mediaAsset.id)
+        } catch (error) {
+          console.error("Couldn't start the transcript.", error)
+        }
+      }
+
+      return refreshed
     }
     case "ad": {
       const adLibraryItem = await loadAdLibraryItem(assetId)

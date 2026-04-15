@@ -4,6 +4,9 @@ import { Button } from "@/components/ui/button"
 import { Spacer } from "@/components/ui/spacer"
 import { formatTimecode } from "@/lib/utils"
 
+import { TranscriptButton } from "../transcript/transcript-button"
+import type { TranscriptSlot } from "../transcript/types"
+
 type ToolbarProps = {
   currentTimeMs: number
   zoomPercent: number
@@ -11,6 +14,7 @@ type ToolbarProps = {
   canZoomOut: boolean
   canUndo: boolean
   canRedo: boolean
+  transcript?: TranscriptSlot
   onUndo: () => void | Promise<void>
   onRedo: () => void | Promise<void>
   onZoomChange: (zoomPercent: number) => void
@@ -32,6 +36,7 @@ export const Toolbar = ({
   canZoomOut,
   canUndo,
   canRedo,
+  transcript,
   onUndo,
   onRedo,
   onZoomChange,
@@ -49,6 +54,7 @@ export const Toolbar = ({
       <Spacer />
       <TimeDisplay timeMs={currentTimeMs} />
       <Spacer />
+      {transcript ? <TranscriptButton {...transcript} /> : null}
       <ZoomSlider
         zoomPercent={zoomPercent}
         canZoomIn={canZoomIn}

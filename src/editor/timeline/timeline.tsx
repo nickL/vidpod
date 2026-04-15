@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 
+import { APP_HEADER_HEIGHT_PX } from "@/components/layout/constants"
 import { Spacer } from "@/components/ui/spacer"
-import { formatTimecode } from "@/lib/utils"
+import { cn, formatTimecode } from "@/lib/utils"
 
 import type { Marker, MarkerActivation, MediaWaveform } from "../types"
+import type { TranscriptSlot } from "../transcript/types"
 
 import { Playhead } from "./playhead"
 import {
@@ -90,6 +92,7 @@ type TimelineProps = {
   selectedMarkerId?: string
   canUndo: boolean
   canRedo: boolean
+  transcript?: TranscriptSlot
   onMarkerTimeCommit: (markerId: string, requestedTimeMs: number) => void
   onActivateMarker: (markerId: string, requestedTimeMs: number) => void
   onSelectMarker: (markerId: string) => void
@@ -110,6 +113,7 @@ export const Timeline = ({
   selectedMarkerId,
   canUndo,
   canRedo,
+  transcript,
   onMarkerTimeCommit,
   onActivateMarker,
   onSelectMarker,
@@ -666,7 +670,13 @@ export const Timeline = ({
   }, [contentWidthPx, markerActivation, timelineDurationMs])
 
   return (
-    <section className="flex flex-col rounded-2xl border border-zinc-200 bg-white p-8 min-[1400px]:col-span-2">
+    <section
+      className={cn(
+        "flex flex-col rounded-2xl border border-zinc-200 bg-white p-8 min-[1400px]:col-span-2",
+        transcript?.isOpen && "sticky z-10"
+      )}
+      style={transcript?.isOpen ? { top: APP_HEADER_HEIGHT_PX } : undefined}
+    >
       <Toolbar
         currentTimeMs={displayTimeMs}
         zoomPercent={zoomPercent}
@@ -674,6 +684,7 @@ export const Timeline = ({
         canZoomOut={canZoomOut}
         canUndo={canUndo}
         canRedo={canRedo}
+        transcript={transcript}
         onUndo={onUndo}
         onRedo={onRedo}
         onZoomChange={handleZoomSliderChange}

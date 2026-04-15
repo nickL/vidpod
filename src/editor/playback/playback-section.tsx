@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
+import { AnimatePresence } from "motion/react"
 
 import {
   recordPlaybackEventAction,
@@ -10,6 +11,8 @@ import {
 import { HLSDebugModal } from "../mp4-export/hls-debug-modal"
 import { PlayerPanel } from "./player-panel"
 import { Timeline } from "../timeline"
+import { TranscriptPanel } from "../transcript/transcript-panel"
+import { useTranscript } from "../transcript/use-transcript"
 import { usePlayback } from "./use-playback"
 
 import type {
@@ -18,6 +21,7 @@ import type {
   MarkerActivation,
   MediaAsset,
   Mp4ExportJob,
+  TranscriptJob,
   UploadProgressState,
 } from "../types"
 
@@ -26,6 +30,7 @@ type PlaybackSectionProps = {
   hlsBaseUrl?: string
   episodeDurationMs?: number
   mainMediaAsset?: MediaAsset
+  transcriptJob?: TranscriptJob
   replacementEpisodeVideo?: EpisodeVideoAsset
   uploadError?: string
   videoUploadProgress?: UploadProgressState
@@ -62,6 +67,7 @@ export const PlaybackSection = ({
   hlsBaseUrl,
   episodeDurationMs,
   mainMediaAsset,
+  transcriptJob,
   replacementEpisodeVideo,
   uploadError,
   videoUploadProgress,
@@ -92,6 +98,13 @@ export const PlaybackSection = ({
   const [previewManifestUrl, setPreviewManifestUrl] = useState<string>()
   const [previewError, setPreviewError] = useState<string>()
   const [mp4Job, setMp4Job] = useState<Mp4ExportJob>()
+  const [isTranscriptOpen, setIsTranscriptOpen] = useState(false)
+  const { transcript } = useTranscript({
+    mainMediaAssetId: mainMediaAsset?.id,
+    initialJob: transcriptJob,
+  })
+  const canShowTranscript =
+    transcript.status === "processing" || transcript.status === "ready"
 
   const startPlaybackSession = useCallback(
     async (playheadTimeMs: number) => {
@@ -175,6 +188,12 @@ export const PlaybackSection = ({
 
     seekToTime(markerActivation.requestedTimeMs)
   }, [markerActivation, seekToTime])
+
+  useEffect(() => {
+    if (!canShowTranscript) {
+      setIsTranscriptOpen(false)
+    }
+  }, [canShowTranscript])
 
   // Toggle Playback via Spacebar
   useSpacebarPlayPause(togglePlayback)
@@ -343,6 +362,14 @@ export const PlaybackSection = ({
         selectedMarkerId={selectedMarkerId}
         canUndo={canUndo}
         canRedo={canRedo}
+        transcript={
+          canShowTranscript
+            ? {
+                isOpen: isTranscriptOpen,
+                onToggle: () => setIsTranscriptOpen((open) => !open),
+              }
+            : undefined
+        }
         onMarkerTimeCommit={onMarkerTimeCommit}
         onActivateMarker={onActivateMarker}
         onSelectMarker={onSelectMarker}
@@ -352,6 +379,17 @@ export const PlaybackSection = ({
         onScrubEnd={handleScrubEnd}
         onScrubStart={handleScrubStart}
       />
+      <AnimatePresence>
+        {canShowTranscript && isTranscriptOpen ? (
+          <TranscriptPanel
+            key="transcript-panel"
+            transcript={transcript}
+            currentTimeMs={displayTimeMs}
+            onSeek={seekToTime}
+            onClose={() => setIsTranscriptOpen(false)}
+          />
+        ) : null}
+      </AnimatePresence>
     </>
   )
 }
