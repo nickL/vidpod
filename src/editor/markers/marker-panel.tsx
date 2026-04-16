@@ -58,8 +58,8 @@ export const MarkerPanel = ({
   onActivateMarker,
 }: MarkerPanelProps) => {
   return (
-    <div className="flex flex-col gap-3" style={manropeStyle}>
-      <div className="@container flex min-h-136 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-8">
+    <div className="flex h-full flex-col gap-3" style={manropeStyle}>
+      <div className="@container flex min-h-136 flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-200 bg-white p-8">
         <div className="flex items-center justify-between gap-4">
           <h2 className="truncate text-base font-bold text-zinc-800">Ad markers</h2>
           <span className="shrink-0 whitespace-nowrap text-base font-semibold text-zinc-500">
