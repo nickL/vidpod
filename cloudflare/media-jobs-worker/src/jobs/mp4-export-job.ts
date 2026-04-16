@@ -52,9 +52,17 @@ type Mp4ExportResult = {
   sizeBytes?: number
 }
 
+type Mp4ExportArtifact = Omit<Mp4ExportInput["artifact"], "uploadUrl">
+
 type Mp4ExportJobUpdateResult = {
   error?: string
   claimed?: boolean
+  currentStatus?: "queued" | "processing" | "ready" | "failed"
+}
+
+type Mp4ExportJobReconcileResult = {
+  error?: string
+  recovered?: boolean
   currentStatus?: "queued" | "processing" | "ready" | "failed"
 }
 
@@ -70,6 +78,7 @@ type Mp4ExportProgressCallback = {
 
 type ActiveAttempt = {
   attemptId: string
+  artifact?: Mp4ExportArtifact
   startedAtMs?: number
 }
 
@@ -107,6 +116,37 @@ const updateMp4ExportJob = async (env: Env, body: unknown) => {
   if (!response.ok) {
     throw new Error(
       payload?.error || "Unable to update MP4 export job state in the app."
+    )
+  }
+
+  return payload
+}
+
+const reconcileMp4ExportJob = async (
+  env: Env,
+  jobId: string,
+  artifact: Mp4ExportArtifact
+) => {
+  const response = await fetchApp(
+    env,
+    `/api/worker/mp4-export-jobs/${jobId}/reconcile`,
+    {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ artifact }),
+    }
+  )
+
+  const payload = (await response.json().catch(() => null)) as
+    | Mp4ExportJobReconcileResult
+    | null
+
+  if (!response.ok) {
+    throw new Error(
+      payload?.error || "Unable to reconcile MP4 export job state in the app."
     )
   }
 
@@ -280,6 +320,10 @@ export class Mp4ExportJob extends DurableObject<Env> {
     }
 
     try {
+      if (await this.recoverAttempt(jobId, attempt)) {
+        return
+      }
+
       await updateMp4ExportJob(this.env, {
         event: "failed",
         jobId,
@@ -303,6 +347,11 @@ export class Mp4ExportJob extends DurableObject<Env> {
     return this.activeAttempt?.attemptId === attemptId
   }
 
+  private async saveAttempt(attempt: ActiveAttempt) {
+    this.activeAttempt = attempt
+    await this.ctx.storage.put(ACTIVE_ATTEMPT_KEY, attempt)
+  }
+
   private async clearAttempt(attemptId?: string) {
     if (attemptId && !this.isActiveAttempt(attemptId)) {
       return
@@ -311,6 +360,50 @@ export class Mp4ExportJob extends DurableObject<Env> {
     this.activeAttempt = undefined
     await this.ctx.storage.deleteAlarm()
     await this.ctx.storage.deleteAll()
+  }
+
+  private async loadAttemptArtifact(
+    jobId: string,
+    attempt: ActiveAttempt
+  ): Promise<Mp4ExportArtifact | undefined> {
+    if (this.activeAttempt?.artifact && this.isActiveAttempt(attempt.attemptId)) {
+      return this.activeAttempt.artifact
+    }
+
+    const input = await loadMp4ExportInput(this.env, jobId)
+
+    if (!this.isActiveAttempt(attempt.attemptId)) {
+      return undefined
+    }
+
+    const { uploadUrl: _uploadUrl, ...artifact } = input.artifact
+    await this.saveAttempt({ ...attempt, artifact })
+
+    return artifact
+  }
+
+  private async recoverAttempt(
+    jobId: string,
+    attempt: ActiveAttempt
+  ): Promise<boolean> {
+    const artifact = await this.loadAttemptArtifact(jobId, attempt)
+
+    if (!artifact || !this.isActiveAttempt(attempt.attemptId)) {
+      return false
+    }
+
+    const result = await reconcileMp4ExportJob(this.env, jobId, artifact)
+    const reachedTerminalState =
+      result?.recovered ||
+      result?.currentStatus === "ready" ||
+      result?.currentStatus === "failed"
+
+    if (reachedTerminalState) {
+      await this.clearAttempt(attempt.attemptId)
+      return true
+    }
+
+    return false
   }
 
   private async executeAttempt(jobId: string, attempt: ActiveAttempt) {
@@ -335,6 +428,10 @@ export class Mp4ExportJob extends DurableObject<Env> {
       }
 
       const input = await loadMp4ExportInput(this.env, jobId)
+      const { uploadUrl: _uploadUrl, ...artifact } = input.artifact
+
+      await this.saveAttempt({ ...attempt, artifact })
+
       const progressCallback = {
         jobId,
         token: this.env.MEDIA_JOBS_TOKEN,
@@ -355,8 +452,6 @@ export class Mp4ExportJob extends DurableObject<Env> {
         return
       }
 
-      const { uploadUrl: _uploadUrl, ...artifact } = input.artifact
-
       await updateMp4ExportJob(this.env, {
         event: "ready",
         jobId,
@@ -370,6 +465,10 @@ export class Mp4ExportJob extends DurableObject<Env> {
       await this.clearAttempt(attempt.attemptId)
     } catch (error) {
       if (!this.isActiveAttempt(attempt.attemptId)) {
+        return
+      }
+
+      if (await this.recoverAttempt(jobId, attempt)) {
         return
       }
 

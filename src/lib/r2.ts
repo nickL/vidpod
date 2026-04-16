@@ -1,6 +1,11 @@
 import "server-only"
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3"
+import {
+  GetObjectCommand,
+  HeadObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
 
 import { serverEnv } from "@/env/server"
@@ -91,6 +96,34 @@ export const createR2DownloadUrl = async ({
     }),
     { expiresIn }
   )
+}
+
+export const getR2ObjectSize = async (key: string) => {
+  const { bucket } = getR2Settings()
+
+  try {
+    const response = await getR2Client().send(
+      new HeadObjectCommand({
+        Bucket: bucket,
+        Key: key,
+      })
+    )
+
+    return response.ContentLength
+  } catch (error) {
+    if (error instanceof Error && error.name === "NotFound") {
+      return undefined
+    }
+
+    const statusCode = (error as { $metadata?: { httpStatusCode?: number } })?.$metadata
+      ?.httpStatusCode
+
+    if (statusCode === 404) {
+      return undefined
+    }
+
+    throw error
+  }
 }
 
 export const readR2Json = async <T>(key: string): Promise<T> => {

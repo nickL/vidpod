@@ -35,6 +35,7 @@
   "env": {
     "dev": {
       "name": "vidpod-app-dev",
+      "routes": [],
       "secrets": {
         "required": [
           "DATABASE_URL",

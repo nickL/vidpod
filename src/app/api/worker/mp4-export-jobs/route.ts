@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { serverEnv } from "@/env/server"
 import {
   applyMp4ExportJobStateUpdate,
+  isMp4Artifact,
   type Mp4ExportJobStateUpdate,
 } from "@/editor/mp4-export-jobs"
 import { isMp4ExportJobPhase } from "@/editor/mp4-export/phases"
@@ -13,18 +14,6 @@ const asObject = (value: unknown) =>
   value && typeof value === "object"
     ? (value as Record<string, unknown>)
     : null
-
-const isMp4Artifact = (value: unknown) => {
-  const artifact = asObject(value)
-
-  return (
-    !!artifact &&
-    artifact.storage === "r2" &&
-    artifact.contentType === "video/mp4" &&
-    typeof artifact.key === "string" &&
-    typeof artifact.fileName === "string"
-  )
-}
 
 const parseUpdate = (value: unknown): Mp4ExportJobStateUpdate | null => {
   const payload = asObject(value)

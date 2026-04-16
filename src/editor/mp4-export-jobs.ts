@@ -4,7 +4,11 @@ import { and, eq, inArray } from "drizzle-orm"
 
 import { db } from "@/db"
 import { mp4ExportJobs } from "@/db/schema"
-import { createR2DownloadUrl, createR2UploadUrl } from "@/lib/r2"
+import {
+  createR2DownloadUrl,
+  createR2UploadUrl,
+  getR2ObjectSize,
+} from "@/lib/r2"
 import { serverEnv } from "@/env/server"
 
 import { getMp4Plan } from "./playback/playback-sessions"
@@ -68,10 +72,30 @@ export type Mp4ExportJobInput = {
   }
 }
 
+export type Mp4ExportJobReconcileResult = {
+  recovered: boolean
+  currentStatus?: "queued" | "processing" | "ready" | "failed"
+}
+
 const getErrorMessage = (error: unknown, fallbackMessage: string) => {
   return error instanceof Error && error.message
     ? error.message
     : fallbackMessage
+}
+
+export const isMp4Artifact = (value: unknown): value is Mp4ExportArtifact => {
+  if (!value || typeof value !== "object") {
+    return false
+  }
+
+  const artifact = value as Record<string, unknown>
+
+  return (
+    artifact.storage === "r2" &&
+    artifact.contentType === "video/mp4" &&
+    typeof artifact.key === "string" &&
+    typeof artifact.fileName === "string"
+  )
 }
 
 const slugify = (value: string) => {
@@ -233,6 +257,73 @@ export const getMp4ExportDownloadUrl = async (jobId: string) => {
     fileName: output.fileName,
     contentType: output.contentType,
   })
+}
+
+export const reconcileMp4ExportJob = async ({
+  jobId,
+  artifact,
+}: {
+  jobId: string
+  artifact: Mp4ExportArtifact
+}): Promise<Mp4ExportJobReconcileResult> => {
+  const job = await loadJobRow(jobId)
+
+  if (!job) {
+    return { recovered: false }
+  }
+
+  if (job.status === "ready" || job.status === "failed") {
+    return {
+      recovered: false,
+      currentStatus: job.status,
+    }
+  }
+
+  const sizeBytes = await getR2ObjectSize(artifact.key)
+
+  if (sizeBytes === undefined) {
+    return {
+      recovered: false,
+      currentStatus: job.status,
+    }
+  }
+
+  const now = new Date()
+  const result = await db
+    .update(mp4ExportJobs)
+    .set({
+      status: "ready",
+      phase: null,
+      outputJson: {
+        ...artifact,
+        sizeBytes,
+      },
+      progressMessage: "Your MP4 is ready to download.",
+      error: null,
+      completedAt: now,
+      updatedAt: now,
+    })
+    .where(
+      and(
+        eq(mp4ExportJobs.id, jobId),
+        inArray(mp4ExportJobs.status, ["queued", "processing"])
+      )
+    )
+    .returning({ id: mp4ExportJobs.id })
+
+  if (result.length > 0) {
+    return {
+      recovered: true,
+      currentStatus: "ready",
+    }
+  }
+
+  const currentJob = await loadJobRow(jobId)
+
+  return {
+    recovered: currentJob?.status === "ready",
+    currentStatus: currentJob?.status,
+  }
 }
 
 export const startMp4ExportJob = async (playbackSessionId: string) => {
