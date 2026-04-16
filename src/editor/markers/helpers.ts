@@ -175,6 +175,26 @@ export const buildAutoPlaceDrafts = ({
     })
 }
 
+export const isOpenMarkerTime = ({
+  timeMs,
+  markers,
+  durationMs,
+}: {
+  timeMs: number
+  markers: Marker[]
+  durationMs?: number
+}) => {
+  if (!durationMs || durationMs < MARKER_DURATION_MS) {
+    return false
+  }
+
+  const openIntervals = getOpenMarkerIntervals(markers, durationMs)
+
+  return openIntervals.some(
+    (interval) => timeMs >= interval.startMs && timeMs <= interval.endMs
+  )
+}
+
 export const findOpenMarkerTimeMs = ({
   idealTimeMs,
   markers,

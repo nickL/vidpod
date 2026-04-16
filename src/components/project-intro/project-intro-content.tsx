@@ -33,8 +33,7 @@ export const projectIntro: ProjectIntro = {
           also upload your own.
         </li>
         <li>
-          <strong>Ad Markers:</strong> Drag as needed. <i>Note:</i> I added a
-          rule to prevent overlap. LMK any issues.
+          <strong>Ad Markers:</strong> Drag as needed. Saves on the fly.
         </li>
         <li>
           <strong>Video Upload:</strong> Swap in a new episode video and set it as the source. 

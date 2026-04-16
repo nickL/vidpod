@@ -7,6 +7,7 @@ import {
   ContentWaveform,
   type WaveformBar,
 } from "./content-waveform"
+import { MarkerDragOverlay } from "./marker-drag-overlay"
 import { MarkerSegment } from "./marker-segment"
 import { buildSegments, type Segment } from "./segments"
 
@@ -17,6 +18,8 @@ type TrackProps = {
   waveform?: MediaWaveform
   selectedMarkerId?: string
   draggingMarkerId?: string
+  draftRequestedTimeMs?: number
+  isDraftTimeOpen?: boolean
   onMarkerDragStart?: (
     event: React.PointerEvent<HTMLDivElement>,
     markerId: string
@@ -30,7 +33,6 @@ type TrackSegmentProps = {
   waveformBars?: WaveformBar[]
   waveformStatus: MediaWaveformStatus
   selectedMarkerId?: string
-  draggingMarkerId?: string
   onMarkerDragStart?: (
     event: React.PointerEvent<HTMLDivElement>,
     markerId: string
@@ -44,11 +46,19 @@ export const Track = ({
   waveform,
   selectedMarkerId,
   draggingMarkerId,
+  draftRequestedTimeMs,
+  isDraftTimeOpen,
   onMarkerDragStart,
 }: TrackProps) => {
+  const stationaryMarkers = useMemo(
+    () => draggingMarkerId
+      ? markers.filter((m) => m.id !== draggingMarkerId)
+      : markers,
+    [draggingMarkerId, markers]
+  )
   const segments = useMemo(
-    () => buildSegments(markers, timelineDurationMs),
-    [markers, timelineDurationMs]
+    () => buildSegments(stationaryMarkers, timelineDurationMs),
+    [stationaryMarkers, timelineDurationMs]
   )
   const waveformBars = useMemo(
     () =>
@@ -60,6 +70,9 @@ export const Track = ({
     [contentWidthPx, timelineDurationMs, waveform]
   )
   const waveformStatus: MediaWaveformStatus = waveform?.status ?? "pending"
+  const draggingMarker = draggingMarkerId
+    ? markers.find((m) => m.id === draggingMarkerId)
+    : undefined
 
   return (
     <div className="relative h-32 rounded-l-lg bg-zinc-950 py-2">
@@ -77,11 +90,20 @@ export const Track = ({
             waveformBars={waveformBars}
             waveformStatus={waveformStatus}
             selectedMarkerId={selectedMarkerId}
-            draggingMarkerId={draggingMarkerId}
             onMarkerDragStart={onMarkerDragStart}
           />
         ))}
       </div>
+
+      {draggingMarker && draftRequestedTimeMs !== undefined && (
+        <MarkerDragOverlay
+          marker={draggingMarker}
+          draftRequestedTimeMs={draftRequestedTimeMs}
+          timelineDurationMs={timelineDurationMs}
+          contentWidthPx={contentWidthPx}
+          isDraftTimeOpen={isDraftTimeOpen ?? true}
+        />
+      )}
     </div>
   )
 }
@@ -93,7 +115,6 @@ const TrackSegment = ({
   waveformBars,
   waveformStatus,
   selectedMarkerId,
-  draggingMarkerId,
   onMarkerDragStart,
 }: TrackSegmentProps) => {
   const durationMs = segment.endMs - segment.startMs
@@ -116,7 +137,6 @@ const TrackSegment = ({
     <MarkerSegment
       marker={segment.marker}
       flexGrow={durationMs}
-      isDragging={segment.marker.id === draggingMarkerId}
       isSelected={segment.marker.id === selectedMarkerId}
       onDragStart={onMarkerDragStart}
     />

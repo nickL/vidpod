@@ -7,6 +7,7 @@ import { APP_HEADER_HEIGHT_PX } from "@/components/layout/constants"
 import { Spacer } from "@/components/ui/spacer"
 import { cn, formatTimecode } from "@/lib/utils"
 
+import { isOpenMarkerTime } from "../markers/helpers"
 import type { Marker, MarkerActivation, MediaWaveform } from "../types"
 import type { TranscriptSlot } from "../transcript/types"
 
@@ -72,8 +73,6 @@ type MarkerDragState = {
   markerId: string
   pointerId: number
   startClientX: number
-  minRequestedTimeMs: number
-  maxRequestedTimeMs: number
   pointerOffsetMs: number
 }
 
@@ -161,11 +160,15 @@ export const Timeline = ({
     [contentWidthPx, defaultRulerScale, timelineDurationMs]
   )
   const timelineMarkers = useMemo(() => {
-    if (!markerDragState || draftRequestedTimeMs === undefined) {
-      if (!droppedMarkerPosition) {
-        return markers
-      }
+    if (markerDragState && draftRequestedTimeMs !== undefined) {
+      return markers.map((marker) =>
+        marker.id === markerDragState.markerId
+          ? { ...marker, requestedTimeMs: draftRequestedTimeMs }
+          : marker
+      )
+    }
 
+    if (droppedMarkerPosition) {
       return markers.map((marker) =>
         marker.id === droppedMarkerPosition.markerId
           ? { ...marker, requestedTimeMs: droppedMarkerPosition.requestedTimeMs }
@@ -173,12 +176,20 @@ export const Timeline = ({
       )
     }
 
-    return markers.map((marker) =>
-      marker.id === markerDragState.markerId
-        ? { ...marker, requestedTimeMs: draftRequestedTimeMs }
-        : marker
-    )
+    return markers
   }, [draftRequestedTimeMs, droppedMarkerPosition, markerDragState, markers])
+
+  const isDraftTimeOpen = useMemo(() => {
+    if (!markerDragState || draftRequestedTimeMs === undefined) {
+      return true
+    }
+
+    return isOpenMarkerTime({
+      timeMs: draftRequestedTimeMs,
+      markers: markers.filter((m) => m.id !== markerDragState.markerId),
+      durationMs: timelineDurationMs,
+    })
+  }, [draftRequestedTimeMs, markerDragState, markers, timelineDurationMs])
 
   useEffect(() => {
     markerDragStateRef.current = markerDragState
@@ -399,31 +410,19 @@ export const Timeline = ({
       onSelectMarker(markerId)
 
       const pointerTimeMs = getTimeAtPointerX(event.clientX)
-      const { minRequestedTimeMs, maxRequestedTimeMs } = getMarkerDragBounds(
-        markers,
-        markerId,
-        timelineDurationMs
-      )
-      const startRequestedTimeMs = clampMarkerRequestedTime(
-        marker.requestedTimeMs,
-        minRequestedTimeMs,
-        maxRequestedTimeMs
-      )
 
       const nextDragState = {
         markerId,
         pointerId: event.pointerId,
         startClientX: event.clientX,
-        minRequestedTimeMs,
-        maxRequestedTimeMs,
         pointerOffsetMs: pointerTimeMs - marker.requestedTimeMs,
       }
 
       markerDragStateRef.current = nextDragState
       setMarkerDragState(nextDragState)
-      setDraftRequestedTimeMs(startRequestedTimeMs)
+      setDraftRequestedTimeMs(marker.requestedTimeMs)
     },
-    [getTimeAtPointerX, markers, onSelectMarker, timelineDurationMs]
+    [getTimeAtPointerX, markers, onSelectMarker]
   )
 
   const finishMarkerDrag = useCallback(
@@ -439,20 +438,31 @@ export const Timeline = ({
         return
       }
 
-      if (didDrag && marker.requestedTimeMs !== nextRequestedTimeMs) {
+      if (!didDrag) {
+        clearMarkerDrag()
+        onActivateMarker(markerId, marker.requestedTimeMs)
+        return
+      }
+
+      const canCommit =
+        marker.requestedTimeMs !== nextRequestedTimeMs &&
+        isOpenMarkerTime({
+          timeMs: nextRequestedTimeMs,
+          markers: markers.filter((m) => m.id !== markerId),
+          durationMs: timelineDurationMs,
+        })
+
+      if (canCommit) {
         setDroppedMarkerPosition({
           markerId,
           requestedTimeMs: nextRequestedTimeMs,
         })
         onMarkerTimeCommit(markerId, nextRequestedTimeMs)
-      } else {
-        setDroppedMarkerPosition(null)
-        onActivateMarker(markerId, marker.requestedTimeMs)
       }
 
       clearMarkerDrag()
     },
-    [clearMarkerDrag, markers, onActivateMarker, onMarkerTimeCommit]
+    [clearMarkerDrag, markers, onActivateMarker, onMarkerTimeCommit, timelineDurationMs]
   )
 
   const cancelMarkerDrag = useCallback(() => {
@@ -474,10 +484,9 @@ export const Timeline = ({
       event.preventDefault()
 
       const pointerTimeMs = getTimeAtPointerX(event.clientX)
-      const nextRequestedTimeMs = clampMarkerRequestedTime(
-        pointerTimeMs - currentDragState.pointerOffsetMs,
-        currentDragState.minRequestedTimeMs,
-        currentDragState.maxRequestedTimeMs
+      const maxStartMs = Math.max(timelineDurationMs - MARKER_DURATION_MS, 0)
+      const nextRequestedTimeMs = Math.round(
+        Math.max(0, Math.min(pointerTimeMs - currentDragState.pointerOffsetMs, maxStartMs))
       )
 
       setDraftRequestedTimeMs(nextRequestedTimeMs)
@@ -493,10 +502,9 @@ export const Timeline = ({
       event.preventDefault()
 
       const pointerTimeMs = getTimeAtPointerX(event.clientX)
-      const nextRequestedTimeMs = clampMarkerRequestedTime(
-        pointerTimeMs - currentDragState.pointerOffsetMs,
-        currentDragState.minRequestedTimeMs,
-        currentDragState.maxRequestedTimeMs
+      const maxStartMs = Math.max(timelineDurationMs - MARKER_DURATION_MS, 0)
+      const nextRequestedTimeMs = Math.round(
+        Math.max(0, Math.min(pointerTimeMs - currentDragState.pointerOffsetMs, maxStartMs))
       )
       const didDrag =
         Math.abs(event.clientX - currentDragState.startClientX) >=
@@ -528,7 +536,7 @@ export const Timeline = ({
       window.removeEventListener("pointerup", handlePointerUp)
       window.removeEventListener("pointercancel", handlePointerCancel)
     }
-  }, [cancelMarkerDrag, finishMarkerDrag, getTimeAtPointerX, markerDragState])
+  }, [cancelMarkerDrag, finishMarkerDrag, getTimeAtPointerX, markerDragState, timelineDurationMs])
 
   const zoomToFactor = useCallback(
     (nextZoomFactor: number) => {
@@ -701,9 +709,10 @@ export const Timeline = ({
           waveform={waveform}
           selectedMarkerId={selectedMarkerId}
           draggingMarkerId={markerDragState?.markerId}
-          dragPreviewTimeMs={
+          draftRequestedTimeMs={
             markerDragState ? draftRequestedTimeMs : undefined
           }
+          isDraftTimeOpen={isDraftTimeOpen}
           rulerScale={rulerScale}
           onMarkerDragStart={handleMarkerDragStart}
           onPointerCancel={handleViewportPointerCancel}
@@ -843,7 +852,8 @@ type TimelineViewportProps = {
   waveform?: MediaWaveform
   selectedMarkerId?: string
   draggingMarkerId?: string
-  dragPreviewTimeMs?: number
+  draftRequestedTimeMs?: number
+  isDraftTimeOpen: boolean
   rulerScale: RulerScale
   onMarkerDragStart: (
     event: React.PointerEvent<HTMLDivElement>,
@@ -864,7 +874,8 @@ const TimelineViewport = ({
   waveform,
   selectedMarkerId,
   draggingMarkerId,
-  dragPreviewTimeMs,
+  draftRequestedTimeMs,
+  isDraftTimeOpen,
   rulerScale,
   onMarkerDragStart,
   onPointerCancel,
@@ -873,10 +884,17 @@ const TimelineViewport = ({
   onPointerUp,
   onScroll,
 }: TimelineViewportProps) => {
+  const stationaryMarkers = useMemo(
+    () =>
+      draggingMarkerId
+        ? markers.filter((marker) => marker.id !== draggingMarkerId)
+        : markers,
+    [draggingMarkerId, markers]
+  )
   const dragPreviewLeftPx =
-    dragPreviewTimeMs !== undefined && contentWidthPx > 0
+    draftRequestedTimeMs !== undefined && contentWidthPx > 0
       ? timeToPx(
-          dragPreviewTimeMs + MARKER_DURATION_MS / 2,
+          draftRequestedTimeMs + MARKER_DURATION_MS / 2,
           timelineDurationMs,
           contentWidthPx
         )
@@ -911,23 +929,30 @@ const TimelineViewport = ({
           waveform={waveform}
           selectedMarkerId={selectedMarkerId}
           draggingMarkerId={draggingMarkerId}
+          draftRequestedTimeMs={draftRequestedTimeMs}
+          isDraftTimeOpen={isDraftTimeOpen}
           onMarkerDragStart={onMarkerDragStart}
         />
         <Ruler
           timelineLengthMs={timelineDurationMs}
           contentWidthPx={contentWidthPx}
-          markers={markers}
+          markers={stationaryMarkers}
           rulerScale={rulerScale}
         />
         <AnimatePresence>
-          {dragPreviewLeftPx !== undefined && dragPreviewTimeMs !== undefined ? (
+          {dragPreviewLeftPx !== undefined && draftRequestedTimeMs !== undefined ? (
             <motion.div
               key="drag-time-preview"
               initial={{ opacity: 0, y: 4, scale: 0.96 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
               exit={{ opacity: 0, y: 4, scale: 0.96 }}
               transition={{ duration: 0.12, ease: "easeOut" }}
-              className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md bg-zinc-900 font-semibold text-white shadow-lg ring-1 ring-zinc-950/20"
+              className={cn(
+                "pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full rounded-md font-semibold shadow-lg ring-1",
+                isDraftTimeOpen
+                  ? "bg-zinc-900 text-white ring-zinc-950/20"
+                  : "bg-red-400/80 text-white ring-red-400/20"
+              )}
               style={{
                 left: dragPreviewLeftPx,
                 top: HANDLE_ZONE_HEIGHT + 4,
@@ -939,58 +964,12 @@ const TimelineViewport = ({
                 fontVariantNumeric: "tabular-nums",
               }}
             >
-              {formatTimecode(dragPreviewTimeMs)}
+              {formatTimecode(draftRequestedTimeMs)}
             </motion.div>
           ) : null}
         </AnimatePresence>
       </div>
     </div>
-  )
-}
-
-const getMarkerDragBounds = (
-  markers: Marker[],
-  markerId: string,
-  timelineDurationMs: number
-) => {
-  const sortedMarkers = [...markers].sort(
-    (leftMarker, rightMarker) =>
-      leftMarker.requestedTimeMs - rightMarker.requestedTimeMs
-  )
-  const markerIndex = sortedMarkers.findIndex((marker) => marker.id === markerId)
-  const previousMarker = markerIndex > 0 ? sortedMarkers[markerIndex - 1] : undefined
-  const nextMarker =
-    markerIndex >= 0 && markerIndex < sortedMarkers.length - 1
-      ? sortedMarkers[markerIndex + 1]
-      : undefined
-  const maxTimelineStartMs = Math.max(timelineDurationMs - MARKER_DURATION_MS, 0)
-
-  return {
-    minRequestedTimeMs: previousMarker
-      ? previousMarker.requestedTimeMs + MARKER_DURATION_MS
-      : 0,
-    maxRequestedTimeMs: Math.min(
-      nextMarker
-        ? nextMarker.requestedTimeMs - MARKER_DURATION_MS
-        : maxTimelineStartMs,
-      maxTimelineStartMs
-    ),
-  }
-}
-
-const clampMarkerRequestedTime = (
-  requestedTimeMs: number,
-  minRequestedTimeMs: number,
-  maxRequestedTimeMs: number
-) => {
-  const clampedMaxRequestedTimeMs = Math.max(
-    minRequestedTimeMs,
-    maxRequestedTimeMs
-  )
-
-  return Math.max(
-    minRequestedTimeMs,
-    Math.min(Math.round(requestedTimeMs), clampedMaxRequestedTimeMs)
   )
 }
 
