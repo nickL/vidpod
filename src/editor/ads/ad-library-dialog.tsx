@@ -123,6 +123,7 @@ export const AdLibraryDialog = ({
       return
     }
 
+    setSearchQuery("")
     onUploadAds(files)
   }
 
