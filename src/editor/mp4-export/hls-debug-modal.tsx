@@ -1,6 +1,6 @@
 "use client"
 
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import { type ReactNode, useEffect, useState } from "react"
 import Hls, { type ErrorData } from "hls.js"
 import { Check, Copy } from "lucide-react"
 
@@ -54,7 +54,6 @@ export const HLSDebugModal = ({
   error,
   onOpenChange,
 }: HLSDebugModalProps) => {
-  const videoRef = useRef<HTMLVideoElement | null>(null)
   const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null)
   const [copiedUrl, setCopiedUrl] = useState<string>()
   const [playerError, setPlayerError] = useState<{
@@ -83,8 +82,7 @@ export const HLSDebugModal = ({
       return
     }
 
-    const video = videoRef.current
-    if (!video || !manifestUrl) {
+    if (!videoElement || !manifestUrl) {
       return
     }
 
@@ -94,7 +92,7 @@ export const HLSDebugModal = ({
       })
 
       hls.loadSource(manifestUrl)
-      hls.attachMedia(video)
+      hls.attachMedia(videoElement)
       hls.on(Hls.Events.ERROR, (_event, data: ErrorData) => {
         if (data.fatal) {
           setPlayerError({
@@ -106,19 +104,19 @@ export const HLSDebugModal = ({
 
       return () => {
         hls.destroy()
-        resetVideo(video)
+        resetVideo(videoElement)
       }
     }
 
-    if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = manifestUrl
-      video.load()
+    if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
+      videoElement.src = manifestUrl
+      videoElement.load()
 
       return () => {
-        resetVideo(video)
+        resetVideo(videoElement)
       }
     }
-  }, [manifestUrl, open])
+  }, [manifestUrl, open, videoElement])
 
   const copyManifest = async () => {
     if (!manifestUrl) {
@@ -164,10 +162,7 @@ export const HLSDebugModal = ({
           ) : (
             <div className="overflow-hidden rounded-2xl bg-zinc-950">
               <video
-                ref={(node) => {
-                  videoRef.current = node
-                  setVideoElement(node)
-                }}
+                ref={setVideoElement}
                 className="block w-full max-h-[min(60vh,34rem)] bg-black"
                 controls
                 playsInline
