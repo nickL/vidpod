@@ -1,4 +1,7 @@
 type Env = {
+  APP?: {
+    fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
+  }
   MEDIA_JOBS_TOKEN: string
   APP_INTERNAL_BASE_URL: string
 }
@@ -26,6 +29,17 @@ const CORS_HEADERS = {
   "access-control-allow-origin": "*",
   "access-control-allow-methods": "GET, OPTIONS",
 }
+const APP_BINDING_ORIGIN = "https://app.internal"
+
+const trimTrailingSlash = (value: string) => value.replace(/\/$/, "")
+
+const fetchApp = (env: Env, path: string, init?: RequestInit) => {
+  if (env.APP) {
+    return env.APP.fetch(new URL(path, APP_BINDING_ORIGIN), init)
+  }
+
+  return fetch(`${trimTrailingSlash(env.APP_INTERNAL_BASE_URL)}${path}`, init)
+}
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
@@ -46,9 +60,9 @@ const m3u8 = (body: string) =>
   })
 
 const loadHlsPlan = async (env: Env, sessionId: string): Promise<Plan> => {
-  const appBaseUrl = env.APP_INTERNAL_BASE_URL.replace(/\/$/, "")
-  const response = await fetch(
-    `${appBaseUrl}/api/worker/hls/sessions/${sessionId}/manifest-plan`,
+  const response = await fetchApp(
+    env,
+    `/api/worker/hls/sessions/${sessionId}/manifest-plan`,
     {
       headers: {
         authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,

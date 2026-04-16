@@ -43,7 +43,7 @@ export const projectIntro: ProjectIntro = {
           <strong>HLS Preview:</strong> Play or download the stitched stream.
         </li>
         <li>
-          <strong><i>Transcriptions:</i></strong>  Auto-generated on upload. Click words to scrub through.
+          <strong>Transcriptions:</strong>  Auto-generated on upload. Click words to scrub through.
         </li>
       </ul>
       <p>

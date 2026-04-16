@@ -1,4 +1,4 @@
-import { trimTrailingSlash, type AppJobEnv } from "./shared"
+import { fetchApp, trimTrailingSlash, type AppJobEnv } from "./shared"
 
 export type WaveformJobMessage = {
   jobType: "generate_waveform"
@@ -32,17 +32,14 @@ export const isWaveformJobMessage = (
 }
 
 const postWaveformUpdate = async (env: AppJobEnv, body: unknown) => {
-  const response = await fetch(
-    `${trimTrailingSlash(env.APP_INTERNAL_BASE_URL)}/api/worker/media-waveforms`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }
-  )
+  const response = await fetchApp(env, "/api/worker/media-waveforms", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as

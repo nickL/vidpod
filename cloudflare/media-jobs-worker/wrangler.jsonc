@@ -1,0 +1,104 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "vidpod-media-jobs",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-04-13",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "vidpod-jobs.nlewis.dev",
+      "custom_domain": true
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "MP4_EXPORT_JOB",
+        "class_name": "Mp4ExportJob"
+      },
+      {
+        "name": "TRANSCRIPT_JOB",
+        "class_name": "TranscriptJob"
+      }
+    ]
+  },
+  "ai": {
+    "binding": "AI"
+  },
+  "queues": {
+    "producers": [
+      {
+        "queue": "vidpod-media-jobs",
+        "binding": "MEDIA_JOBS"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "vidpod-media-jobs",
+        "max_batch_size": 1,
+        "max_batch_timeout": 2,
+        "max_retries": 3
+      }
+    ]
+  },
+  "services": [
+    {
+      "binding": "APP",
+      "service": "vidpod-app"
+    }
+  ],
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["Mp4ExportJob"]
+    },
+    {
+      "tag": "v2",
+      "new_sqlite_classes": ["TranscriptJob"]
+    }
+  ],
+  "env": {
+    "dev": {
+      "name": "vidpod-media-jobs-dev",
+      "workers_dev": true,
+      "routes": [],
+      "ai": {
+        "binding": "AI"
+      },
+      "durable_objects": {
+        "bindings": [
+          {
+            "name": "MP4_EXPORT_JOB",
+            "class_name": "Mp4ExportJob"
+          },
+          {
+            "name": "TRANSCRIPT_JOB",
+            "class_name": "TranscriptJob"
+          }
+        ]
+      },
+      "queues": {
+        "producers": [
+          {
+            "queue": "vidpod-media-jobs-dev",
+            "binding": "MEDIA_JOBS"
+          }
+        ],
+        "consumers": [
+          {
+            "queue": "vidpod-media-jobs-dev",
+            "max_batch_size": 1,
+            "max_batch_timeout": 2,
+            "max_retries": 3
+          }
+        ]
+      },
+      "services": [
+        {
+          "binding": "APP",
+          "service": "vidpod-app-dev"
+        }
+      ]
+    }
+  }
+}

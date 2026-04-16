@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers"
 import {
+  fetchApp,
   getErrorMessage,
   jsonResponse,
   trimTrailingSlash,
@@ -90,17 +91,14 @@ export const isMp4ExportJobMessage = (
 }
 
 const updateMp4ExportJob = async (env: Env, body: unknown) => {
-  const response = await fetch(
-    `${trimTrailingSlash(env.APP_INTERNAL_BASE_URL)}/api/worker/mp4-export-jobs`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }
-  )
+  const response = await fetchApp(env, "/api/worker/mp4-export-jobs", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
 
   const payload = (await response.json().catch(() => null)) as
     | Mp4ExportJobUpdateResult
@@ -119,8 +117,9 @@ const loadMp4ExportInput = async (
   env: Env,
   jobId: string
 ): Promise<Mp4ExportInput> => {
-  const response = await fetch(
-    `${trimTrailingSlash(env.APP_INTERNAL_BASE_URL)}/api/worker/mp4-export-jobs/${jobId}/input`,
+  const response = await fetchApp(
+    env,
+    `/api/worker/mp4-export-jobs/${jobId}/input`,
     {
       headers: {
         authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
@@ -339,7 +338,7 @@ export class Mp4ExportJob extends DurableObject<Env> {
       const progressCallback = {
         jobId,
         token: this.env.MEDIA_JOBS_TOKEN,
-        url: `${trimTrailingSlash(this.env.APP_INTERNAL_BASE_URL)}/api/worker/mp4-export-jobs`,
+        url: `${trimTrailingSlash(this.env.TRANSCODER_URL)}/exports/mp4/progress`,
       }
 
       if (!this.isActiveAttempt(attempt.attemptId)) {

@@ -8,9 +8,13 @@
     "start": "next start",
     "lint": "eslint src drizzle.config.ts eslint.config.mjs",
     "test": "vitest run src",
-    "cf:deploy:hls": "pnpm --dir cloudflare/hls-worker exec wrangler deploy",
-    "cf:deploy:jobs": "pnpm --dir cloudflare/media-jobs-worker exec wrangler deploy",
-    "cf:deploy:mp4": "pnpm exec wrangler deploy -c cloudflare/mp4-exporter/wrangler.jsonc",
+    "cf:build:app": "opennextjs-cloudflare build",
+    "cf:preview:app": "opennextjs-cloudflare build && opennextjs-cloudflare preview --env dev",
+    "cf:deploy:app": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "cf:deploy:app:dev": "opennextjs-cloudflare build && opennextjs-cloudflare deploy --env dev",
+    "cf:deploy:hls": "pnpm --filter vidpod-hls-worker run deploy",
+    "cf:deploy:jobs": "pnpm --filter vidpod-media-jobs-worker run deploy",
+    "cf:deploy:mp4": "pnpm --filter vidpod-mp4-exporter run deploy",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx src/db/seed.ts",
@@ -40,6 +44,7 @@
     "uuid": "^13.0.0"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "^1.19.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
@@ -53,6 +58,7 @@
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
-    "vitest": "^4.1.4"
+    "vitest": "^4.1.4",
+    "wrangler": "^4.82.2"
   }
 }

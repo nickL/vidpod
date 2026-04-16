@@ -20,6 +20,8 @@ node_modules
 
 # production
 /build
+.open-next
+.dev.vars*
 
 # misc
 .DS_Store

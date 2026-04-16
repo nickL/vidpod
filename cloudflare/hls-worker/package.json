@@ -1,15 +1,13 @@
 {
-  "name": "vidpod-media-jobs-worker",
+  "name": "vidpod-hls-worker",
   "private": true,
   "type": "module",
   "scripts": {
     "deploy": "wrangler deploy --env=",
     "deploy:dev": "wrangler deploy --env dev",
-    "dev": "wrangler dev --env dev",
-    "typecheck": "tsc --noEmit"
+    "dev": "wrangler dev --env dev"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
     "wrangler": "^4.11.1"
   }
 }

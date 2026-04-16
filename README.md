@@ -8,7 +8,7 @@ Dynamic ads editor for creators. Place markers for ad interstitials, live previe
 
 * TypeScript + Next.js + Tailwind.
 * Drizzle + Neon Postgres (app db for branching / fast iteration)
-* Cloudflare Workers + Stream + R2 + DO for pipelines, HLS.js for playback.
+* Cloudflare Workers + Stream + R2 + DO for pipelines. HLS.js for playback.
 
 ## Setup
 
@@ -19,8 +19,6 @@ pnpm db:migrate
 pnpm db:seed   # loads the demo episode, ad library, and media used by the PoC
 pnpm dev
 ```
-
-**Note:** uploads, waveform jobs, HLS preview, and MP4 export also require the Cloudflare / worker / transcoder envs in `.env`.
 
 ## Ad Library
 
@@ -52,13 +50,19 @@ Place and arrange markers on the episode.
 - [x] Video and ad uploads
 - [x] Real waveforms
 - [x] MP4 generation
-- [x] HLS output (single quality for now, multi coming)
+- [x] HLS output
 - [x] Transcription
 - [x] Durable pipelines
 
 ## Hosting
 
-The core app is edge-deployed on Cloudflare because video bandwidth and egress is a pain at scale. Keeping delivery, compute, and storage on the same network also helps with latency. Cloudflare Stream is used for HLS, Workers for the manifest/session work, and R2 handles persisting assets. Queues and Durable Objects coordinate all the async work, along with retries and recovery.
+Video bandwidth and egress can be a pain at scale, so the entire app runs on Cloudflare:
+
+**Frontend**: Next.js on Cloudflare Worker
+**Video Delivery**: Cloudflare Stream
+**Media Pipeline:** Cloudflare Workers + R2 + Queues + Durable Objects
+
+Keeping delivery, compute, and storage on the same edge network reduces latency.  Services are deployed separately but communicate via bindings. 
 
 
 ## Verify

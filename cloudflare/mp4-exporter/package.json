@@ -3,8 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "cd ../.. && pnpm exec wrangler deploy -c cloudflare/mp4-exporter/wrangler.jsonc",
-    "dev": "cd ../.. && pnpm exec wrangler dev -c cloudflare/mp4-exporter/wrangler.jsonc",
+    "deploy": "wrangler deploy --env=",
+    "deploy:dev": "wrangler deploy --env dev",
+    "dev": "wrangler dev --env dev",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

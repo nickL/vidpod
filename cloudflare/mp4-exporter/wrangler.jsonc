@@ -8,6 +8,12 @@
   "observability": {
     "enabled": true
   },
+  "services": [
+    {
+      "binding": "APP",
+      "service": "vidpod-app"
+    }
+  ],
   "containers": [
     {
       "class_name": "Mp4Exporter",
@@ -36,6 +42,12 @@
       "name": "vidpod-mp4-exporter-dev",
       "workers_dev": true,
       "routes": [],
+      "services": [
+        {
+          "binding": "APP",
+          "service": "vidpod-app-dev"
+        }
+      ],
       "containers": [
         {
           "class_name": "Mp4Exporter",

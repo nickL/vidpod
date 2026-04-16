@@ -1,4 +1,4 @@
-import { trimTrailingSlash, type AppJobEnv } from "./shared"
+import { fetchApp, trimTrailingSlash, type AppJobEnv } from "./shared"
 import type {
   TranscriptChunkMessage,
   TranscriptMessage,
@@ -168,17 +168,14 @@ export const updateTranscriptJob = async (
   env: TranscriptEnv,
   body: unknown
 ) => {
-  const response = await fetch(
-    `${trimTrailingSlash(env.APP_INTERNAL_BASE_URL)}/api/worker/transcript-jobs`,
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify(body),
-    }
-  )
+  const response = await fetchApp(env, "/api/worker/transcript-jobs", {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  })
 
   const payload = (await response.json().catch(() => null)) as
     | TranscriptJobUpdateResult
@@ -195,8 +192,9 @@ export const loadTranscriptJobInput = async (
   env: TranscriptEnv,
   jobId: string
 ): Promise<TranscriptJobInput> => {
-  const response = await fetch(
-    `${trimTrailingSlash(env.APP_INTERNAL_BASE_URL)}/api/worker/transcript-jobs/${jobId}/input`,
+  const response = await fetchApp(
+    env,
+    `/api/worker/transcript-jobs/${jobId}/input`,
     {
       headers: {
         authorization: `Bearer ${env.MEDIA_JOBS_TOKEN}`,
