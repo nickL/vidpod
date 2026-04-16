@@ -28,7 +28,7 @@ const mobileNav: MobileNavItem[] = [
 ]
 
 export const MobileSidebar = () => (
-  <aside className="sticky top-[104px] flex w-16 shrink-0 flex-col items-center gap-7 self-stretch border-r border-zinc-200 bg-sidebar pt-7 lg:hidden">
+  <aside className="sticky top-[var(--app-header-h)] flex w-16 shrink-0 flex-col items-center gap-7 self-stretch border-r border-zinc-200 bg-sidebar pt-7 lg:hidden">
     <VidpodLogo className="text-zinc-700" />
     <nav className="flex flex-col items-center gap-6">
       {mobileNav.map((item) => (

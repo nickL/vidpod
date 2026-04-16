@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, type ChangeEvent } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { Download, LoaderCircle } from "lucide-react"
+import { Download, LoaderCircle, RotateCcw } from "lucide-react"
 import {
   RiAddLine,
   RiContractLeftFill,
@@ -148,10 +148,14 @@ export const PlayerPanel = ({
         {canResetDemo ? (
           <Button
             variant="outline"
+            aria-label="Reset demo"
             disabled={isEpisodeUploadActive || isResettingDemo}
             onClick={() => void onResetDemo()}
           >
-            {isResettingDemo ? "Resetting demo…" : "Reset demo"}
+            <RotateCcw />
+            <span className="hidden @xl:inline">
+              {isResettingDemo ? "Resetting demo…" : "Reset demo"}
+            </span>
           </Button>
         ) : null}
         <input
@@ -168,7 +172,14 @@ export const PlayerPanel = ({
               disabled={!playbackUrl || isPreparingPreview}
               onClick={() => void onPreviewHls()}
             >
-              {isPreparingPreview ? "Preparing HLS…" : "Preview HLS"}
+              {isPreparingPreview ? (
+                "Preparing HLS…"
+              ) : (
+                <>
+                  <span className="@xl:hidden">Preview</span>
+                  <span className="hidden @xl:inline">Preview HLS</span>
+                </>
+              )}
             </Button>
           ) : null}
           <Button
@@ -177,7 +188,7 @@ export const PlayerPanel = ({
             onClick={handleAddVideoClick}
           >
             <RiAddLine />
-            Add new video
+            Add video
           </Button>
           {canExportMp4 ? (
             <Mp4ExportAffordance
@@ -264,7 +275,7 @@ const Mp4ExportAffordance = ({
         className={cn(buttonVariants())}
       >
         <Download />
-        Download MP4
+        Download
       </a>
     )
   }

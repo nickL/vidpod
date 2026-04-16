@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import { AnimatePresence, motion } from "motion/react"
 
-import { APP_HEADER_HEIGHT_PX } from "@/components/layout/constants"
 import { Spacer } from "@/components/ui/spacer"
 import { cn, formatTimecode } from "@/lib/utils"
 
@@ -683,7 +682,7 @@ export const Timeline = ({
         "flex flex-col rounded-2xl border border-zinc-200 bg-white p-8 min-[1400px]:col-span-2",
         transcript?.isOpen && "sticky z-10"
       )}
-      style={transcript?.isOpen ? { top: APP_HEADER_HEIGHT_PX } : undefined}
+      style={transcript?.isOpen ? { top: "var(--app-header-h)" } : undefined}
     >
       <Toolbar
         currentTimeMs={displayTimeMs}

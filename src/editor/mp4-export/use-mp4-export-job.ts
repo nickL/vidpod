@@ -3,12 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 
+import { useActivityBar } from "@/components/layout/activity-bar"
+
 import {
   startMp4ExportJobAction,
   startPlaybackSessionAction,
 } from "../actions"
 
 import type { Mp4ExportJob } from "../types"
+import type { Mp4ExportJobPhase } from "./phases"
 
 type UseMp4ExportJobOptions = {
   episodeId: string
@@ -16,6 +19,12 @@ type UseMp4ExportJobOptions = {
 }
 
 const JOB_POLL_MS = 2_000
+
+const ACTIVITY_PERCENT_BY_PHASE: Record<Mp4ExportJobPhase, number | undefined> = {
+  preparing: 15,
+  rendering: undefined,
+  uploading: 90,
+}
 
 const getJobStorageKey = (episodeId: string) =>
   `vidpod:mp4-export-job:${episodeId}`
@@ -124,6 +133,23 @@ export const useMp4ExportJob = ({
   const job = jobQuery.data
   const error =
     startError ?? (job?.status === "failed" ? job.error : undefined)
+  const activityBar = useActivityBar()
+  const jobStatus = job?.status
+  const jobPhase = job?.phase
+
+  useEffect(() => {
+    const id = `mp4-export:${episodeId}`
+
+    if (isStarting) {
+      activityBar.report(id, undefined)
+      return () => activityBar.clear(id)
+    }
+    if (jobStatus === "queued" || jobStatus === "processing") {
+      const percent = jobPhase ? ACTIVITY_PERCENT_BY_PHASE[jobPhase] : undefined
+      activityBar.report(id, percent)
+      return () => activityBar.clear(id)
+    }
+  }, [activityBar, episodeId, isStarting, jobStatus, jobPhase])
 
   return {
     job,

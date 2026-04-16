@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import * as tus from "tus-js-client"
 
+import { useActivityBar } from "@/components/layout/activity-bar"
+
 import {
   failUploadAction,
   refreshUploadedAssetAction,
@@ -44,6 +46,25 @@ export const useUploadManager = ({
     Partial<Record<UploadTarget, string>>
   >({})
   const [isResettingDemo, setIsResettingDemo] = useState(false)
+  const activityBar = useActivityBar()
+
+  useEffect(() => {
+    const reportedIds: string[] = []
+    for (const [mediaAssetId, progress] of Object.entries(
+      uploadProgressByMediaAssetId
+    )) {
+      const id = `upload:${mediaAssetId}`
+      const percent =
+        progress.phase === "uploading" ? progress.progressPercent : undefined
+      activityBar.report(id, percent)
+      reportedIds.push(id)
+    }
+    return () => {
+      for (const id of reportedIds) {
+        activityBar.clear(id)
+      }
+    }
+  }, [activityBar, uploadProgressByMediaAssetId])
 
   useEffect(() => {
     const uploadPollTimeouts = pollTimeoutsRef.current

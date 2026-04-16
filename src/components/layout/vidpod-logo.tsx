@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils"
 
+/* From Figma */
+
 export const VidpodLogo = ({ className }: { className?: string }) => (
   <svg
     width={22}

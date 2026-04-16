@@ -4,7 +4,7 @@ import { VidpodLogo } from "./vidpod-logo"
 export const AppFooter = () => {
   return (
     <footer>
-      <AppBar border="top" className="justify-between">
+      <AppBar border="top" className="h-26 justify-between">
         <span
           style={{ fontFamily: "var(--font-manrope)" }}
           className="text-base font-semibold text-zinc-500"

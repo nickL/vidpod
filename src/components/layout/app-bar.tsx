@@ -10,7 +10,7 @@ export const AppBar = ({ border, children, className }: AppBarProps) => {
   return (
     <div
       className={cn(
-        "flex h-26 shrink-0 items-center px-4 lg:px-16",
+        "flex shrink-0 items-center px-4 lg:px-16",
         border === "top" ? "border-t" : "border-b",
         className
       )}
