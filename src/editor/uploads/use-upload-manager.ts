@@ -26,9 +26,11 @@ const MAX_POLL_FAILURES = 5
 
 export const useUploadManager = ({
   episodeId,
+  adLibrary,
   episodeVideoAssets,
 }: {
   episodeId: string
+  adLibrary?: AdLibraryItem[]
   episodeVideoAssets?: EpisodeVideoAsset[]
 }) => {
   const queryClient = useQueryClient()
@@ -229,43 +231,43 @@ export const useUploadManager = ({
   )
 
   useEffect(() => {
-    if (!episodeVideoAssets?.length) {
-      return
-    }
-
-    const inFlightEpisodeVideos = episodeVideoAssets.filter((episodeVideoAsset) => {
-      const mediaAssetId = episodeVideoAsset.mediaAsset.id
-      const status = episodeVideoAsset.mediaAsset.status
-
-      if (uploadProgressByMediaAssetId[mediaAssetId]) {
+    const recoverableUploads = [
+      ...(episodeVideoAssets ?? []).map((episodeVideoAsset) => ({
+        target: "episode" as const,
+        assetId: episodeVideoAsset.id,
+        mediaAssetId: episodeVideoAsset.mediaAsset.id,
+        status: episodeVideoAsset.mediaAsset.status,
+      })),
+      ...(adLibrary ?? []).map((adLibraryItem) => ({
+        target: "ad" as const,
+        assetId: adLibraryItem.id,
+        mediaAssetId: adLibraryItem.mediaAsset.id,
+        status: adLibraryItem.mediaAsset.status,
+      })),
+    ].filter((upload) => {
+      if (uploadProgressByMediaAssetId[upload.mediaAssetId]) {
         return false
       }
 
-      return status === "uploading" || status === "processing"
+      return upload.status === "uploading" || upload.status === "processing"
     })
 
-    if (inFlightEpisodeVideos.length === 0) {
+    if (recoverableUploads.length === 0) {
       return
     }
 
     const recoverUploads = async () => {
-      for (const episodeVideoAsset of inFlightEpisodeVideos) {
-        const mediaAssetId = episodeVideoAsset.mediaAsset.id
-
-        if (pollTimeoutsRef.current[mediaAssetId] !== undefined) {
+      for (const upload of recoverableUploads) {
+        if (pollTimeoutsRef.current[upload.mediaAssetId] !== undefined) {
           continue
         }
 
-        await pollStatus({
-          target: "episode",
-          assetId: episodeVideoAsset.id,
-          mediaAssetId,
-        })
+        await pollStatus(upload)
       }
     }
 
     recoverUploads().catch(() => undefined)
-  }, [episodeVideoAssets, pollStatus, uploadProgressByMediaAssetId])
+  }, [adLibrary, episodeVideoAssets, pollStatus, uploadProgressByMediaAssetId])
 
   const uploadFile = useCallback(
     async (target: UploadTarget, file: File) => {

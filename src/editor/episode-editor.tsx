@@ -50,6 +50,7 @@ export const EpisodeEditor = ({
     selectEpisodeVideo,
   } = useUploadManager({
     episodeId,
+    adLibrary: data?.adLibrary,
     episodeVideoAssets: data?.episodeVideoAssets,
   })
   const {
