@@ -58,9 +58,9 @@ Place and arrange markers on the episode.
 
 Video bandwidth and egress can be a pain at scale, so the entire app runs on Cloudflare:
 
-**Frontend**: Next.js on Cloudflare Worker
-**Video Delivery**: Cloudflare Stream
-**Media Pipeline:** Cloudflare Workers + R2 + Queues + Durable Objects
+- **Frontend**: Next.js on Cloudflare Worker
+- **Video Delivery**: Cloudflare Stream
+- **Media Pipeline:** Cloudflare Workers + R2 + Queues + Durable Objects
 
 Keeping delivery, compute, and storage on the same edge network reduces latency.  Services are deployed separately but communicate via bindings. 
 
